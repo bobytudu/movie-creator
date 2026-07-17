@@ -1,5 +1,5 @@
 import { graph } from "./src/graph.ts";
-import { loadAppConfig, OLLAMA_MODEL } from "./src/config.ts";
+import { loadAppConfig, OLLAMA_MODEL, callOllama } from "./src/config.ts";
 import { initializeImageCounter } from "./src/comfy.ts";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
@@ -62,8 +62,27 @@ try {
   }
 
   if (shouldGenerateStory) {
+    console.log(`\n\x1b[36m[Ollama] Enhancing initial topic with Ollama...\x1b[0m`);
+    const systemPrompt = `You are a creative writing assistant. Your task is to take a short story premise and expand it with descriptive detail, rich sensory imagery, and compelling depth, while preserving the core idea. Do not write a script, outline, or full story. Write a detailed paragraph (around 3 to 5 sentences) summarizing the expanded premise.`;
+    const userPrompt = `Expand this story premise: "${topic}"`;
+    
+    let enhancedTopic = topic;
+    try {
+      const result = await callOllama([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ], false);
+      if (result && typeof result === "string") {
+        enhancedTopic = result.trim();
+      }
+    } catch (err) {
+      console.error(`\x1b[31m[Warning] Failed to enhance topic using Ollama: ${err}. Proceeding with original topic.\x1b[0m`);
+    }
+    
+    console.log(`\x1b[32m[Ollama] Enhanced Topic: "${enhancedTopic}"\x1b[0m\n`);
+
     await graph.invoke({
-      topic: topic,
+      topic: enhancedTopic,
       style: style,
       outputFile: outputFile
     });

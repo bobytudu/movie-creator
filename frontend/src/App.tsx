@@ -176,9 +176,23 @@ export default function App() {
     };
   }, []);
 
-  const fetchStory = async () => {
+  // Poll story updates periodically during active generation so the user sees newly generated assets in real time
+  useEffect(() => {
+    if (generatorStatus !== 'generating') return;
+
+    // Fetch once immediately to catch early updates
+    fetchStory(true);
+
+    const interval = setInterval(() => {
+      fetchStory(true);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [generatorStatus]);
+
+  const fetchStory = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const res = await fetch('http://localhost:3001/api/story');
       if (!res.ok) {
@@ -189,7 +203,7 @@ export default function App() {
     } catch (err: any) {
       setError(err.message || 'An error occurred while fetching the story.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -454,6 +468,9 @@ export default function App() {
             styleInput={styleInput}
             setStyleInput={setStyleInput}
             handleTriggerFullGeneration={handleTriggerFullGeneration}
+            showConsole={showConsole}
+            setShowConsole={setShowConsole}
+            generatorStatus={generatorStatus}
           />
 
           {story && (
@@ -520,22 +537,39 @@ export default function App() {
 
               {/* Scenes Cards Grid */}
               <div className="scene-grid">
-                {story.scenes.map((scene) => (
-                  <SceneCard
-                    key={scene.sceneNumber}
-                    scene={scene}
-                    isRegenerating={regeneratingMap[scene.sceneNumber] || null}
-                    elapsedTime={elapsedTimeMap[scene.sceneNumber] || null}
-                    handleUpdateScript={handleUpdateScript}
-                    handleUpdateDescription={handleUpdateDescription}
-                    handleEnhanceText={handleEnhanceText}
-                    handleSendSceneChat={handleSendSceneChat}
-                    handleRegenerate={handleRegenerate}
-                    getMediaUrl={getMediaUrl}
-                    setPreviewImageSceneNum={setPreviewImageSceneNum}
-                    setError={setError}
-                  />
-                ))}
+                {(() => {
+                  // Find the scene index that is currently generating during full generation
+                  const activeGeneratingSceneNum = (() => {
+                    if (generatorStatus !== 'generating' || !story || !story.scenes) return null;
+                    const activeScene = story.scenes.find((s) => !s.videoPath);
+                    return activeScene ? activeScene.sceneNumber : null;
+                  })();
+
+                  return story.scenes.map((scene) => {
+                    const isSceneGenerating = activeGeneratingSceneNum === scene.sceneNumber;
+                    const generatingType = isSceneGenerating
+                      ? (!scene.imagePath ? 'image' : 'video')
+                      : null;
+
+                    return (
+                      <SceneCard
+                        key={scene.sceneNumber}
+                        scene={scene}
+                        isRegenerating={regeneratingMap[scene.sceneNumber] || null}
+                        isGenerating={generatingType}
+                        elapsedTime={elapsedTimeMap[scene.sceneNumber] || null}
+                        handleUpdateScript={handleUpdateScript}
+                        handleUpdateDescription={handleUpdateDescription}
+                        handleEnhanceText={handleEnhanceText}
+                        handleSendSceneChat={handleSendSceneChat}
+                        handleRegenerate={handleRegenerate}
+                        getMediaUrl={getMediaUrl}
+                        setPreviewImageSceneNum={setPreviewImageSceneNum}
+                        setError={setError}
+                      />
+                    );
+                  });
+                })()}
               </div>
             </>
           )}

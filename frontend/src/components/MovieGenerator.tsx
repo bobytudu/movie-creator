@@ -7,6 +7,9 @@ interface MovieGeneratorProps {
   styleInput: string;
   setStyleInput: (val: string) => void;
   handleTriggerFullGeneration: (e: React.FormEvent) => void;
+  showConsole: boolean;
+  setShowConsole: (val: boolean) => void;
+  generatorStatus: 'idle' | 'generating' | 'success' | 'failed';
 }
 
 export const MovieGenerator: React.FC<MovieGeneratorProps> = ({
@@ -15,7 +18,10 @@ export const MovieGenerator: React.FC<MovieGeneratorProps> = ({
   setTopicInput,
   styleInput,
   setStyleInput,
-  handleTriggerFullGeneration
+  handleTriggerFullGeneration,
+  showConsole,
+  setShowConsole,
+  generatorStatus
 }) => {
   return (
     <div className="generator-bar">
@@ -28,18 +34,48 @@ export const MovieGenerator: React.FC<MovieGeneratorProps> = ({
           </svg>
           Trigger Full Movie Production
         </h2>
-        <div className={`badge ${
-          comfyStatus === 'connected' ? 'badge-cyan' : comfyStatus === 'connecting' ? 'badge-amber' : 'badge-purple'
-        }`} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-          <span style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: comfyStatus === 'connected' ? '#00b8d9' : comfyStatus === 'connecting' ? '#f59e0b' : '#8b66ff',
-            boxShadow: comfyStatus === 'connected' ? '0 0 8px #00b8d9' : comfyStatus === 'connecting' ? '0 0 8px #f59e0b' : '0 0 8px #8b66ff',
-            display: 'inline-block'
-          }}></span>
-          ComfyUI: {comfyStatus.toUpperCase()}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {generatorStatus !== 'idle' && (
+            <button
+              type="button"
+              className="console-toggle-btn"
+              onClick={() => setShowConsole(!showConsole)}
+              style={{
+                background: 'rgba(139, 102, 255, 0.15)',
+                border: '1px solid rgba(139, 102, 255, 0.4)',
+                color: '#c084fc',
+                padding: '0.3rem 0.75rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              {showConsole ? 'Hide Logs' : 'Show Logs'}
+            </button>
+          )}
+          <div className={`badge ${
+            comfyStatus === 'connected' ? 'badge-cyan' : comfyStatus === 'connecting' ? 'badge-amber' : 'badge-purple'
+          }`} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: comfyStatus === 'connected' ? '#00b8d9' : comfyStatus === 'connecting' ? '#f59e0b' : '#8b66ff',
+              boxShadow: comfyStatus === 'connected' ? '0 0 8px #00b8d9' : comfyStatus === 'connecting' ? '0 0 8px #f59e0b' : '0 0 8px #8b66ff',
+              display: 'inline-block'
+            }}></span>
+            ComfyUI: {comfyStatus.toUpperCase()}
+          </div>
         </div>
       </div>
       <form onSubmit={handleTriggerFullGeneration} className="generator-form">

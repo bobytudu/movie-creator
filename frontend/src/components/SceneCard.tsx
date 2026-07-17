@@ -4,6 +4,7 @@ import { Scene } from '../types';
 interface SceneCardProps {
   scene: Scene;
   isRegenerating: 'image' | 'video' | 'both' | null;
+  isGenerating?: 'image' | 'video' | 'both' | null;
   elapsedTime: number | null;
   handleUpdateScript: (sceneNumber: number, script: string) => Promise<void>;
   handleUpdateDescription: (sceneNumber: number, description: string) => Promise<void>;
@@ -18,6 +19,7 @@ interface SceneCardProps {
 export const SceneCard: React.FC<SceneCardProps> = ({
   scene,
   isRegenerating,
+  isGenerating = null,
   elapsedTime,
   handleUpdateScript,
   handleUpdateDescription,
@@ -150,16 +152,21 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   return (
     <div className="scene-card">
       
-      {/* Active Regeneration Loader Overlay */}
-      {isRegenerating && (
+      {/* Active Generation/Regeneration Loader Overlay */}
+      {(isRegenerating || isGenerating) && (
         <div className="card-loader-overlay">
           <div className="spinner"></div>
           <span className="card-loader-text">
-            Regenerating {isRegenerating === 'both' ? 'Assets' : isRegenerating}...
+            {isGenerating
+              ? `Generating ${isGenerating === 'both' ? 'Assets' : isGenerating}...`
+              : `Regenerating ${isRegenerating === 'both' ? 'Assets' : isRegenerating}...`
+            }
           </span>
-          <span className="card-loader-subtext" style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)', fontWeight: 'bold', marginTop: '4px' }}>
-            {elapsedTime || 0} sec elapsed
-          </span>
+          {elapsedTime !== null && (
+            <span className="card-loader-subtext" style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)', fontWeight: 'bold', marginTop: '4px' }}>
+              {elapsedTime} sec elapsed
+            </span>
+          )}
           <span className="card-loader-subtext">This may take up to a minute</span>
         </div>
       )}

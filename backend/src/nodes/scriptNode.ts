@@ -1,16 +1,22 @@
 import { callOllama } from "../config.ts";
 import type { StoryStateType, Scene } from "../state.ts";
 
-function estimateDuration(text: string): number {
-  const words = text
+export function estimateDuration(script: string, description: string): number {
+  const cleanScript = (script || "")
     .replace(/\[[^\]]+\]/g, "") // remove speaker tags
     .replace(/\([^)]+\)/g, "") // remove stage directions
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const wordCount = words.length;
-  const calculated = wordCount > 0 ? Math.ceil(wordCount / 2.5) + 2 : 6;
-  // Strictly enforce/cap duration between 6 and 16 seconds
+    .trim();
+  const scriptWords = cleanScript.split(/\s+/).filter(Boolean).length;
+  
+  const cleanDesc = (description || "").trim();
+  const descWords = cleanDesc.split(/\s+/).filter(Boolean).length;
+
+  // Dialogue time: ~2 words per second, plus 2 seconds base
+  const scriptDuration = scriptWords > 0 ? Math.ceil(scriptWords / 2) + 2 : 0;
+  // Action description time: ~3 words per second, plus 3 seconds base
+  const descDuration = descWords > 0 ? Math.ceil(descWords / 3) + 3 : 6;
+
+  const calculated = Math.max(scriptDuration, descDuration);
   return Math.min(16, Math.max(6, calculated));
 }
 
@@ -58,6 +64,7 @@ Generate a JSON object that strictly adheres to this structure:
   "setting": "Setting description for this scene",
   "description": "Brief summary of the scene's action (ensure it is aware of and connects logically with the previous scene description)",
   "script": "The full detailed script of the scene containing dialogues.",
+  "duration": A number between 6 and 16 representing the duration of the scene in seconds based on dialogue length and action complexity,
   "imagePrompt": "A highly detailed, single-paragraph image generation prompt containing camera direction, lighting, setting details, character names with their exact looks, poses, and expressions.",
   "sameCameraAngle": true or false
 }
@@ -89,15 +96,19 @@ Image Prompt: ${prevScene.imagePrompt}`;
     ], true);
 
     const imagePrompt = response.imagePrompt || "";
+    const finalDescription = response.description || sceneOutline.description;
+    const finalScript = response.script || "";
     
     // Create the raw scene
     const rawScene: Scene = {
       sceneNumber: sceneOutline.sceneNumber,
       setting: response.setting || sceneOutline.setting,
-      description: response.description || sceneOutline.description,
-      script: response.script || "",
+      description: finalDescription,
+      script: finalScript,
       imagePrompt: imagePrompt,
-      duration: estimateDuration(response.script || ""),
+      duration: typeof response.duration === 'number' && response.duration >= 6 && response.duration <= 16
+        ? Math.round(response.duration)
+        : estimateDuration(finalScript, finalDescription),
       sameCameraAngle: response.sameCameraAngle === true
     };
 

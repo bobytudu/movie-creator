@@ -40,9 +40,8 @@ export const ConsoleModal: React.FC<ConsoleModalProps> = ({
             type="button" 
             className="console-close-btn"
             onClick={() => setShowConsole(false)}
-            disabled={generatorStatus === 'generating'}
           >
-            {generatorStatus === 'generating' ? 'Processing...' : 'Close Terminal'}
+            {generatorStatus === 'generating' ? 'Hide Terminal (Keeps Generating)' : 'Close Terminal'}
           </button>
         </div>
         <div className="console-main-container" style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>

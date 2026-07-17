@@ -17,6 +17,7 @@ import {
   extractLastFrame,
 } from "./src/comfy_service.ts";
 import { runVideoMerge } from "./src/video_service.ts";
+import { estimateDuration } from "./src/nodes/scriptNode.ts";
 
 config(); // Load environment variables
 
@@ -226,6 +227,13 @@ CRITICAL Instructions:
           }
         }
 
+        // Recalculate duration automatically when manually editing script or description
+        scene.duration = estimateDuration(scene.script || "", scene.description || "");
+
+        // Recalculate story duration
+        const storyDuration = storyData.scenes?.reduce((acc: number, s: any) => acc + (s.duration || 0), 0) || 0;
+        storyData.storyDuration = storyDuration;
+
         // Save updated assets
         await fs.writeFile(storyAssetsPath, JSON.stringify(storyData, null, 2), "utf-8");
 
@@ -240,6 +248,8 @@ CRITICAL Instructions:
               mainScene.description = description;
               mainScene.imagePrompt = scene.imagePrompt;
             }
+            mainScene.duration = scene.duration;
+            mainStory.storyDuration = storyDuration;
             await fs.writeFile(storyPath, JSON.stringify(mainStory, null, 2), "utf-8");
           }
         } catch {
@@ -346,7 +356,8 @@ Keep the updated Dialogue Script brief (under 30 words), ensuring that only char
 You must output a JSON object adhering strictly to this schema:
 {
   "description": "The updated cinematic visual action description",
-  "script": "The updated dialogue or narration script"
+  "script": "The updated dialogue or narration script",
+  "duration": A number between 6 and 16 representing the updated scene duration in seconds based on dialogue and action
 }
 
 Only return a raw, valid JSON object.`;
@@ -369,6 +380,13 @@ User Edit Request Instruction: "${instruction}"`;
           if (response && response.description !== undefined && response.script !== undefined) {
             scene.description = response.description;
             scene.script = response.script;
+            scene.duration = typeof response.duration === 'number' && response.duration >= 6 && response.duration <= 16
+              ? Math.round(response.duration)
+              : estimateDuration(scene.script || "", scene.description || "");
+
+            // Recalculate story duration
+            const storyDuration = storyData.scenes?.reduce((acc: number, s: any) => acc + (s.duration || 0), 0) || 0;
+            storyData.storyDuration = storyDuration;
 
             // Regenerate imagePrompt using Ollama based on the updated scene description
             try {
@@ -410,6 +428,8 @@ CRITICAL Instructions:
                 mainScene.description = scene.description;
                 mainScene.script = scene.script;
                 mainScene.imagePrompt = scene.imagePrompt;
+                mainScene.duration = scene.duration;
+                mainStory.storyDuration = storyDuration;
                 await fs.writeFile(storyPath, JSON.stringify(mainStory, null, 2), "utf-8");
               }
             } catch {}
