@@ -400,6 +400,128 @@ Return ONLY the raw enhanced script. Do not add explanations, intro text, markdo
         }
       }
 
+      // 2.7 POST /api/scene/chat
+      if (req.method === "POST" && pathname === "/api/scene/chat") {
+        const body = (await req.json()) as any;
+        const { sceneNumber, instruction } = body;
+        if (sceneNumber === undefined || !instruction) {
+          return new Response(JSON.stringify({ error: "Missing sceneNumber or instruction" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+
+        const fileContent = await fs.readFile(storyAssetsPath, "utf-8");
+        const storyData = JSON.parse(fileContent);
+
+        const scene = storyData.scenes.find((s: any) => s.sceneNumber === sceneNumber);
+        if (!scene) {
+          return new Response(JSON.stringify({ error: `Scene ${sceneNumber} not found` }), {
+            status: 404,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+
+        console.log(`[Server] Modifying scene ${sceneNumber} with instruction: "${instruction}"`);
+
+        const style = storyData.style || "realistic";
+        const systemPrompt = `You are a professional screenwriter and storyboard script editor.
+You will be given:
+1. The overall story premise and characters.
+2. The visual style of the story: "${style}".
+3. The current details of a specific scene (Setting, Visual Action Description, and Dialogue/Narration Script).
+4. An instruction from the user specifying modifications they want to make to this specific scene (e.g. adding objects, modifying actions, changing dialogue).
+
+Your task is to modify the scene's Visual Action Description and/or Dialogue/Narration Script to incorporate the user's requested instruction while maintaining consistency with characters, setting, and style.
+Keep the updated Visual Action Description detailed but concise.
+Keep the updated Dialogue/Narration Script extremely short (under 15 words) and formatted as speaker lines like [Character Name]: Dialogue or [Narrator]: Narration.
+
+You must output a JSON object adhering strictly to this schema:
+{
+  "description": "The updated cinematic visual action description",
+  "script": "The updated dialogue or narration script"
+}
+
+Only return a raw, valid JSON object.`;
+
+        const userPrompt = `Story Premise: ${storyData.premise || ""}
+Characters: ${JSON.stringify(storyData.characters || [], null, 2)}
+Scene Number: ${sceneNumber}
+Scene Setting: ${scene.setting || ""}
+Current Visual Action Description: "${scene.description || ""}"
+Current Dialogue/Narration Script: "${scene.script || ""}"
+
+User Edit Request Instruction: "${instruction}"`;
+
+        try {
+          const response = await callOllama([
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ], true); // jsonMode = true
+
+          if (response && response.description !== undefined && response.script !== undefined) {
+            scene.description = response.description;
+            scene.script = response.script;
+
+            // Regenerate imagePrompt using Ollama based on the updated scene description
+            try {
+              const systemPromptImage = `You are a professional storyboard artist.
+Given the following scene setting, scene action description, visual style, and character profiles, generate a highly detailed, single-paragraph image generation prompt containing camera direction, lighting, setting details, character names with their exact looks, poses, and expressions.
+Visual style: ${style}
+Characters: ${JSON.stringify(storyData.characters || [], null, 2)}
+Scene Setting: ${scene.setting || ""}
+Scene Action Description: ${scene.description}
+
+CRITICAL Instructions:
+1. The prompt must be a single paragraph.
+2. Incorporate character looks and style-specific descriptors.
+3. Characters MUST NEVER look directly at the camera or viewer.
+4. Return ONLY the raw image generation prompt paragraph. Do not add explanation, JSON, markdown formatting, or intro text.`;
+
+              console.log(`[Server] Generating new imagePrompt for scene ${sceneNumber} due to AI chat update...`);
+              const responsePrompt = await callOllama([
+                { role: 'system', content: systemPromptImage },
+                { role: 'user', content: `Generate the image prompt.` }
+              ], false);
+              if (responsePrompt && typeof responsePrompt === "string") {
+                scene.imagePrompt = responsePrompt.trim();
+                console.log(`[Server] New imagePrompt generated: "${scene.imagePrompt.substring(0, 100)}..."`);
+              }
+            } catch (err: any) {
+              console.error(`[Server] Failed to regenerate imagePrompt after AI chat update: ${err.message}`);
+            }
+
+            // Save updated assets
+            await fs.writeFile(storyAssetsPath, JSON.stringify(storyData, null, 2), "utf-8");
+
+            // Sync with story_output.json
+            try {
+              const mainContent = await fs.readFile(storyPath, "utf-8");
+              const mainStory = JSON.parse(mainContent);
+              const mainScene = mainStory.scenes.find((s: any) => s.sceneNumber === sceneNumber);
+              if (mainScene) {
+                mainScene.description = scene.description;
+                mainScene.script = scene.script;
+                mainScene.imagePrompt = scene.imagePrompt;
+                await fs.writeFile(storyPath, JSON.stringify(mainStory, null, 2), "utf-8");
+              }
+            } catch {}
+
+            return new Response(JSON.stringify({ success: true, story: storyData }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          } else {
+            throw new Error("Invalid response format from Ollama.");
+          }
+        } catch (err: any) {
+          console.error(`[Server] Failed to process AI chat instruction for scene ${sceneNumber}: ${err.message}`);
+          return new Response(JSON.stringify({ error: `Failed to process AI chat instruction: ${err.message}` }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
       // 3. POST /api/scene/regenerate
       if (req.method === "POST" && pathname === "/api/scene/regenerate") {
         const body = (await req.json()) as any;
@@ -500,6 +622,27 @@ Return ONLY the raw enhanced script. Do not add explanations, intro text, markdo
         return new Response(JSON.stringify({ success: true, story: storyData }), {
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
+      }
+
+      // 3.5 POST /api/story/merge
+      if (req.method === "POST" && pathname === "/api/story/merge") {
+        console.log("[Server] Manual video merge requested.");
+        try {
+          await runVideoMerge();
+          const fileContent = await fs.readFile(storyAssetsPath, "utf-8");
+          const storyData = JSON.parse(fileContent);
+          storyData.outputDir = outputDir;
+          storyData.mergedVideoPath = `${outputDir}/video/merged_output.mp4`.replace(/\\/g, "/");
+          return new Response(JSON.stringify({ success: true, story: storyData }), {
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        } catch (err: any) {
+          console.error(`[Server] Manual video merge failed: ${err.message}`);
+          return new Response(JSON.stringify({ error: `Manual video merge failed: ${err.message}` }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
       }
 
       // 4. GET /api/generate/stream

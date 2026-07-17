@@ -3,34 +3,13 @@ import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import './storyboard.css';
 
-interface Character {
-  name: string;
-  role: string;
-  description: string;
-}
-
-interface Scene {
-  sceneNumber: number;
-  setting: string;
-  description: string;
-  script: string;
-  imagePrompt: string;
-  duration?: number;
-  imagePath?: string;
-  videoPath?: string;
-}
-
-interface StoryManifest {
-  title: string;
-  genre: string;
-  premise: string;
-  style: string;
-  storyDuration: number;
-  characters: Character[];
-  scenes: Scene[];
-  mergedVideoPath?: string;
-  outputDir?: string;
-}
+import { StoryManifest } from './types';
+import { MovieGenerator } from './components/MovieGenerator';
+import { MoviePreview } from './components/MoviePreview';
+import { CharacterList } from './components/CharacterList';
+import { SceneCard } from './components/SceneCard';
+import { ConsoleModal } from './components/ConsoleModal';
+import { LightboxModal } from './components/LightboxModal';
 
 export default function App() {
   const [story, setStory] = useState<StoryManifest | null>(null);
@@ -39,18 +18,6 @@ export default function App() {
   
   // Track ongoing asset regeneration per scene: { [sceneNum]: 'image' | 'video' | 'both' | null }
   const [regeneratingMap, setRegeneratingMap] = useState<Record<number, 'image' | 'video' | 'both' | null>>({});
-  
-  // Script editing states
-  const [editingSceneNum, setEditingSceneNum] = useState<number | null>(null);
-  const [editedScript, setEditedScript] = useState('');
-
-  // Description editing states
-  const [editingDescSceneNum, setEditingDescSceneNum] = useState<number | null>(null);
-  const [editedDescription, setEditedDescription] = useState('');
-
-  // Track text enhancement loading states per scene
-  const [enhancingDescSceneNum, setEnhancingDescSceneNum] = useState<number | null>(null);
-  const [enhancingScriptSceneNum, setEnhancingScriptSceneNum] = useState<number | null>(null);
 
   // Track cache busters for scene media (forces browsers to reload regenerated images/videos)
   const [mediaCacheBuster, setMediaCacheBuster] = useState<Record<number, number>>({});
@@ -58,8 +25,10 @@ export default function App() {
   // Track which scene is currently being previewed in the image lightbox modal
   const [previewImageSceneNum, setPreviewImageSceneNum] = useState<number | null>(null);
 
-  // Track which scene videos are actively playing in place
-  const [playingVideoMap, setPlayingVideoMap] = useState<Record<number, boolean>>({});
+  // Track active timer intervals for scene regeneration
+  const timersRef = useRef<Record<number, ReturnType<typeof setInterval>>>({});
+  // Track elapsed time (seconds) for each scene's active regeneration
+  const [elapsedTimeMap, setElapsedTimeMap] = useState<Record<number, number>>({});
 
   // Generator & real-time log states
   const [topicInput, setTopicInput] = useState('');
@@ -78,123 +47,13 @@ export default function App() {
   }
 
   // ComfyUI WebSocket Connection States
-  const [comfyStatus, setComfyStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
-  const [comfyExecutingNode, setComfyExecutingNode] = useState<string | null>(null);
-  const [comfyProgress, setComfyProgress] = useState<{ value: number, max: number } | null>(null);
-  const [comfyPreviewUrl, setComfyPreviewUrl] = useState<string | null>(null);
+  const [comfyStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const [comfyExecutingNode] = useState<string | null>(null);
+  const [comfyProgress] = useState<{ value: number, max: number } | null>(null);
+  const [comfyPreviewUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-    let isMounted = true;
-
-    function connect() {
-      if (!isMounted) return;
-      
-      setComfyStatus('connecting');
-      // const wsUrl = `ws://127.0.0.1:8188/ws?clientId=${clientIdRef.current}`;
-      const wsUrl = `http://localhost:8188/ws`;
-      console.log(`[ComfyWS] Connecting to ${wsUrl}`);
-      
-      try {
-        ws = new WebSocket(wsUrl);
-        ws.binaryType = "blob";
-      } catch (err) {
-        console.error('[ComfyWS] Socket creation failed:', err);
-        setComfyStatus('disconnected');
-        scheduleReconnect();
-        return;
-      }
-
-      ws.onopen = () => {
-        if (!isMounted) return;
-        console.log('[ComfyWS] Connected successfully');
-        setComfyStatus('connected');
-      };
-
-      ws.onclose = (event) => {
-        if (!isMounted) return;
-        console.log('[ComfyWS] Connection closed:', event.reason);
-        setComfyStatus('disconnected');
-        setComfyExecutingNode(null);
-        setComfyProgress(null);
-        setComfyPreviewUrl(null);
-        scheduleReconnect();
-      };
-
-      ws.onerror = (error) => {
-        if (!isMounted) return;
-        console.error('[ComfyWS] Error:', error);
-      };
-
-      ws.onmessage = async (event) => {
-        console.log(event)
-        if (!isMounted) return;
-
-        // Handle Binary message (Preview Frames)
-        if (event.data instanceof Blob) {
-          const url = URL.createObjectURL(event.data);
-          setComfyPreviewUrl((prevUrl) => {
-            if (prevUrl) URL.revokeObjectURL(prevUrl);
-            return url;
-          });
-          return;
-        }
-
-        // Handle Text message (JSON execution progress/status)
-        if (typeof event.data === "string") {
-          try {
-            const message = JSON.parse(event.data);
-            switch (message.type) {
-              case 'executing': {
-                const node = message.data.node;
-                setComfyExecutingNode(node);
-                if (node === null) {
-                  setComfyProgress(null);
-                  setComfyPreviewUrl(null);
-                }
-                break;
-              }
-              case 'progress': {
-                const { value, max } = message.data;
-                setComfyProgress({ value, max });
-                break;
-              }
-              case 'execution_start': {
-                setComfyProgress(null);
-                setComfyPreviewUrl(null);
-                break;
-              }
-              default:
-                break;
-            }
-          } catch (e) {
-            // Ignore parse errors for non-JSON text messages
-          }
-        }
-      };
-    }
-
-    function scheduleReconnect() {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      reconnectTimeout = setTimeout(() => {
-        console.log('[ComfyWS] Attempting reconnection...');
-        connect();
-      }, 5000);
-    }
-
-    connect();
-
-    return () => {
-      isMounted = false;
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (ws) ws.close();
-      setComfyPreviewUrl((prevUrl) => {
-        if (prevUrl) URL.revokeObjectURL(prevUrl);
-        return null;
-      });
-    };
-  }, []);
+  // Track manual movie merging loading state
+  const [mergingVideos, setMergingVideos] = useState(false);
 
   useEffect(() => {
     if (consoleLogEndRef.current) {
@@ -204,6 +63,13 @@ export default function App() {
 
   useEffect(() => {
     fetchStory();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      // Clear any active timers on unmount
+      Object.values(timersRef.current).forEach(clearInterval);
+    };
   }, []);
 
   const fetchStory = async () => {
@@ -223,13 +89,13 @@ export default function App() {
     }
   };
 
-  const handleUpdateScript = async (sceneNumber: number) => {
+  const handleUpdateScript = async (sceneNumber: number, script: string) => {
     try {
       setError(null);
       const res = await fetch('http://localhost:3001/api/scene/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneNumber, script: editedScript }),
+        body: JSON.stringify({ sceneNumber, script }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -238,19 +104,19 @@ export default function App() {
       if (data.success && data.story) {
         setStory(data.story);
       }
-      setEditingSceneNum(null);
     } catch (err: any) {
       setError(err.message || 'Failed to update script.');
+      throw err;
     }
   };
 
-  const handleUpdateDescription = async (sceneNumber: number) => {
+  const handleUpdateDescription = async (sceneNumber: number, description: string) => {
     try {
       setError(null);
       const res = await fetch('http://localhost:3001/api/scene/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneNumber, description: editedDescription }),
+        body: JSON.stringify({ sceneNumber, description }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -259,9 +125,9 @@ export default function App() {
       if (data.success && data.story) {
         setStory(data.story);
       }
-      setEditingDescSceneNum(null);
     } catch (err: any) {
       setError(err.message || 'Failed to update description.');
+      throw err;
     }
   };
 
@@ -321,6 +187,18 @@ export default function App() {
       setError(null);
       setRegeneratingMap((prev) => ({ ...prev, [sceneNumber]: type }));
       
+      // Initialize elapsed time state and start interval timer
+      setElapsedTimeMap((prev) => ({ ...prev, [sceneNumber]: 0 }));
+      if (timersRef.current[sceneNumber]) {
+        clearInterval(timersRef.current[sceneNumber]);
+      }
+      timersRef.current[sceneNumber] = setInterval(() => {
+        setElapsedTimeMap((prev) => ({
+          ...prev,
+          [sceneNumber]: (prev[sceneNumber] || 0) + 1
+        }));
+      }, 1000);
+
       const res = await fetch('http://localhost:3001/api/scene/regenerate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -336,27 +214,27 @@ export default function App() {
         setStory(data.story);
         // Force reload of regenerated media via cache buster
         setMediaCacheBuster((prev) => ({ ...prev, [sceneNumber]: Date.now() }));
-        // If we generated video, reset playing video toggle to make sure it reloads
-        if (type === 'video' || type === 'both') {
-          setPlayingVideoMap((prev) => ({ ...prev, [sceneNumber]: false }));
-        }
       }
     } catch (err: any) {
       setError(err.message || `Failed to regenerate asset for Scene ${sceneNumber}.`);
     } finally {
       setRegeneratingMap((prev) => ({ ...prev, [sceneNumber]: null }));
+      // Stop and clean up the active timer
+      if (timersRef.current[sceneNumber]) {
+        clearInterval(timersRef.current[sceneNumber]);
+        delete timersRef.current[sceneNumber];
+      }
+      setElapsedTimeMap((prev) => {
+        const copy = { ...prev };
+        delete copy[sceneNumber];
+        return copy;
+      });
     }
   };
 
-  const handleEnhanceText = async (sceneNumber: number, type: 'script' | 'description', currentText: string) => {
+  const handleEnhanceText = async (sceneNumber: number, type: 'script' | 'description', currentText: string): Promise<string | undefined> => {
     try {
       setError(null);
-      if (type === 'description') {
-        setEnhancingDescSceneNum(sceneNumber);
-      } else {
-        setEnhancingScriptSceneNum(sceneNumber);
-      }
-
       const res = await fetch('http://localhost:3001/api/scene/enhance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -367,20 +245,60 @@ export default function App() {
         throw new Error(data.error || `Failed to enhance ${type}`);
       }
       if (data.success && data.enhancedText) {
-        if (type === 'description') {
-          setEditedDescription(data.enhancedText);
-        } else {
-          setEditedScript(data.enhancedText);
-        }
+        return data.enhancedText;
       }
     } catch (err: any) {
       setError(err.message || `Failed to enhance ${type}.`);
-    } finally {
-      if (type === 'description') {
-        setEnhancingDescSceneNum(null);
-      } else {
-        setEnhancingScriptSceneNum(null);
+    }
+    return undefined;
+  };
+
+  const handleSendSceneChat = async (sceneNumber: number, instruction: string): Promise<boolean> => {
+    try {
+      setError(null);
+      const res = await fetch('http://localhost:3001/api/scene/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneNumber, instruction }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to apply AI changes');
       }
+
+      if (data.success && data.story) {
+        setStory(data.story);
+        // Automatically trigger image and video generation sequentially
+        handleRegenerate(sceneNumber, 'both');
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      setError(err.message || 'Failed to send AI instruction.');
+      return false;
+    }
+  };
+
+  const handleMergeVideos = async () => {
+    try {
+      setError(null);
+      setMergingVideos(true);
+      const res = await fetch('http://localhost:3001/api/story/merge', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to merge videos');
+      }
+      if (data.success && data.story) {
+        setStory(data.story);
+        // Force reload of merged video via cache buster
+        setMediaCacheBuster((prev) => ({ ...prev, 0: Date.now() }));
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to merge videos.');
+    } finally {
+      setMergingVideos(false);
     }
   };
 
@@ -424,66 +342,15 @@ export default function App() {
             </div>
           )}
 
-          {/* Movie Generator Panel */}
-          <div className="generator-bar">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h2 className="card-title" style={{ fontSize: '1.1rem', marginBottom: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polygon points="6 2 18 2 18 6 6 6 6 2" />
-                  <rect x="3" y="6" width="18" height="16" rx="2" />
-                  <path d="M10 12l5 3-5 3v-6z" />
-                </svg>
-                Trigger Full Movie Production
-              </h2>
-              <div className={`badge ${
-                comfyStatus === 'connected' ? 'badge-cyan' : comfyStatus === 'connecting' ? 'badge-amber' : 'badge-purple'
-              }`} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                <span style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: comfyStatus === 'connected' ? '#00b8d9' : comfyStatus === 'connecting' ? '#f59e0b' : '#8b66ff',
-                  boxShadow: comfyStatus === 'connected' ? '0 0 8px #00b8d9' : comfyStatus === 'connecting' ? '0 0 8px #f59e0b' : '0 0 8px #8b66ff',
-                  display: 'inline-block'
-                }}></span>
-                ComfyUI: {comfyStatus.toUpperCase()}
-              </div>
-            </div>
-            <form onSubmit={handleTriggerFullGeneration} className="generator-form">
-              <div className="form-group" style={{ flexGrow: 3 }}>
-                <label htmlFor="topic-input">Movie Story Topic / Premise</label>
-                <input
-                  id="topic-input"
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. space expedition lost on exoplanet, reactive dangerous flora..."
-                  value={topicInput}
-                  onChange={(e) => setTopicInput(e.target.value)}
-                />
-              </div>
-              <div className="form-group" style={{ flexGrow: 1, minWidth: '160px' }}>
-                <label htmlFor="style-select">Visual Art Style</label>
-                <select
-                  id="style-select"
-                  className="select-field"
-                  value={styleInput}
-                  onChange={(e) => setStyleInput(e.target.value)}
-                >
-                  <option value="realistic">Realistic Cinematic</option>
-                  <option value="anime">Anime / Manga</option>
-                  <option value="cyberpunk">Cyberpunk Neon</option>
-                  <option value="watercolor">Watercolor / Fine Art</option>
-                  <option value="sketch">Pencil Sketch</option>
-                </select>
-              </div>
-              <button type="submit" className="generate-submit-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                Produce Movie
-              </button>
-            </form>
-          </div>
+          {/* Movie Generator Panel Component */}
+          <MovieGenerator
+            comfyStatus={comfyStatus}
+            topicInput={topicInput}
+            setTopicInput={setTopicInput}
+            styleInput={styleInput}
+            setStyleInput={setStyleInput}
+            handleTriggerFullGeneration={handleTriggerFullGeneration}
+          />
 
           {story && (
             <>
@@ -526,63 +393,16 @@ export default function App() {
               <div className="main-dashboard-grid">
                 
                 {/* Final Merged Video Player */}
-                <div className="master-video-card">
-                  <h2 className="card-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
-                      <line x1="7" y1="2" x2="7" y2="22" />
-                      <line x1="17" y1="2" x2="17" y2="22" />
-                      <line x1="2" y1="12" x2="22" y2="12" />
-                      <line x1="2" y1="7" x2="7" y2="7" />
-                      <line x1="2" y1="17" x2="7" y2="17" />
-                      <line x1="17" y1="17" x2="22" y2="17" />
-                      <line x1="17" y1="7" x2="22" y2="7" />
-                    </svg>
-                    Compiled Movie Preview
-                  </h2>
-                  <div className="master-video-container">
-                    {story.mergedVideoPath ? (
-                      <video 
-                        key={story.mergedVideoPath}
-                        controls 
-                        className="master-video-player"
-                        src={getMediaUrl(0, story.mergedVideoPath)}
-                      />
-                    ) : (
-                      <div className="master-video-fallback">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M23 7l-7 5 7 5V7z" />
-                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                        </svg>
-                        <span>No compiled movie found. Generate video scenes to compile the movie automatically.</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <MoviePreview
+                  story={story}
+                  mergingVideos={mergingVideos}
+                  handleMergeVideos={handleMergeVideos}
+                  mediaCacheBuster={mediaCacheBuster}
+                  getMediaUrl={getMediaUrl}
+                />
 
                 {/* Character List Sidebar */}
-                <div className="characters-card">
-                  <h2 className="card-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    Character Profiles
-                  </h2>
-                  <div className="character-list">
-                    {story.characters.map((char, index) => (
-                      <div key={index} className="character-item">
-                        <p className="character-name">
-                          <span>{char.name}</span>
-                          <span className="character-role-badge">{char.role}</span>
-                        </p>
-                        <p className="character-desc">{char.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <CharacterList characters={story.characters} />
 
               </div>
 
@@ -596,353 +416,22 @@ export default function App() {
 
               {/* Scenes Cards Grid */}
               <div className="scene-grid">
-                {story.scenes.map((scene) => {
-                  const isRegenerating = regeneratingMap[scene.sceneNumber];
-                  const isEditing = editingSceneNum === scene.sceneNumber;
-                  const isEditingDesc = editingDescSceneNum === scene.sceneNumber;
-                  const isVideoPlaying = playingVideoMap[scene.sceneNumber];
-
-                  return (
-                    <div key={scene.sceneNumber} className="scene-card">
-                      
-                      {/* Active Regeneration Loader Overlay */}
-                      {isRegenerating && (
-                        <div className="card-loader-overlay">
-                          <div className="spinner"></div>
-                          <span className="card-loader-text">
-                            Regenerating {isRegenerating === 'both' ? 'Assets' : isRegenerating}...
-                          </span>
-                          <span className="card-loader-subtext">This may take up to a minute</span>
-                        </div>
-                      )}
-
-                      {/* Card Header info */}
-                      <div className="scene-card-header">
-                        <div className="scene-card-title">
-                          <span className="scene-card-badge">Scene {scene.sceneNumber}</span>
-                          <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>({scene.duration || 6}s)</span>
-                        </div>
-                        <p className="scene-setting">{scene.setting}</p>
-                      </div>
-
-                      {/* Image/Video Preview container */}
-                      <div className="preview-container">
-                        {isVideoPlaying && scene.videoPath ? (
-                          // In-place Video Player
-                          <video
-                            src={getMediaUrl(scene.sceneNumber, scene.videoPath)}
-                            controls
-                            autoPlay
-                            loop
-                            className="preview-video"
-                          />
-                        ) : scene.imagePath ? (
-                          // Image display
-                          <img
-                            src={getMediaUrl(scene.sceneNumber, scene.imagePath)}
-                            alt={`Scene ${scene.sceneNumber}`}
-                            className="preview-image"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => setPreviewImageSceneNum(scene.sceneNumber)}
-                          />
-                        ) : (
-                          // Empty/Placeholder
-                          <div className="master-video-fallback">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                              <circle cx="8.5" cy="8.5" r="1.5" />
-                              <polyline points="21 15 16 10 5 21" />
-                            </svg>
-                            <span style={{ fontSize: '0.8rem' }}>No image generated yet</span>
-                          </div>
-                        )}
-
-                        {/* Floating actions in top right corner of media container */}
-                        <div className="floating-media-actions">
-                          {scene.imagePath && (
-                            <button
-                              type="button"
-                              className="floating-action-btn"
-                              onClick={() => setPreviewImageSceneNum(scene.sceneNumber)}
-                              title="Preview Image"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <circle cx="11" cy="11" r="8" />
-                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                <line x1="11" y1="8" x2="11" y2="14" />
-                                <line x1="8" y1="11" x2="14" y2="11" />
-                              </svg>
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="floating-action-btn"
-                            disabled={!!isRegenerating}
-                            onClick={() => handleRegenerate(scene.sceneNumber, 'image')}
-                            title="Regenerate Image"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className="floating-action-btn"
-                            disabled={!!isRegenerating || !scene.imagePath}
-                            onClick={() => handleRegenerate(scene.sceneNumber, 'video')}
-                            title={!scene.imagePath ? 'Generate the image first' : 'Regenerate Video'}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path d="M23 7l-7 5 7 5V7z" />
-                              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                            </svg>
-                          </button>
-                        </div>
-
-                        {/* Play Video overlay overlayed on image */}
-                        {!isVideoPlaying && scene.videoPath && (
-                          <button
-                            type="button"
-                            className="video-overlay-btn"
-                            onClick={() => setPlayingVideoMap((prev) => ({ ...prev, [scene.sceneNumber]: true }))}
-                            title="Play Video Scene"
-                          >
-                            <div className="play-icon-bg">
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3" />
-                              </svg>
-                            </div>
-                          </button>
-                        )}
-
-                        {/* Back to image button shown while playing video */}
-                        {isVideoPlaying && (
-                          <div className="media-action-panel">
-                            <button
-                              type="button"
-                              className="media-action-btn"
-                              onClick={() => setPlayingVideoMap((prev) => ({ ...prev, [scene.sceneNumber]: false }))}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <circle cx="8.5" cy="8.5" r="1.5" />
-                                <polyline points="21 15 16 10 5 21" />
-                              </svg>
-                              View Image
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Visual Description & edit options */}
-                      <div className="script-box">
-                        <div className="script-label-row">
-                          <span className="script-label">Visual Action Description</span>
-                          {!isEditingDesc && (
-                            <button
-                              type="button"
-                              className="edit-script-btn"
-                              onClick={() => {
-                                setEditingDescSceneNum(scene.sceneNumber);
-                                setEditedDescription(scene.description);
-                              }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M12 20h9" />
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                              </svg>
-                              Edit Action
-                            </button>
-                          )}
-                        </div>
-
-                        {isEditingDesc ? (
-                          <>
-                            <textarea
-                              className="script-textarea"
-                              value={editedDescription}
-                              onChange={(e) => setEditedDescription(e.target.value)}
-                            />
-                            <div className="edit-actions-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                className="cancel-btn"
-                                onClick={() => setEditingDescSceneNum(null)}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                className="enhance-btn"
-                                disabled={enhancingDescSceneNum === scene.sceneNumber}
-                                onClick={() => handleEnhanceText(scene.sceneNumber, 'description', editedDescription)}
-                              >
-                                {enhancingDescSceneNum === scene.sceneNumber ? 'Enhancing...' : 'Enhance with Ollama'}
-                              </button>
-                              <button
-                                type="button"
-                                className="save-btn"
-                                onClick={() => handleUpdateDescription(scene.sceneNumber)}
-                              >
-                                Save Action
-                              </button>
-                              <button
-                                type="button"
-                                className="save-btn"
-                                style={{ background: 'linear-gradient(135deg, var(--green-accent) 0%, var(--accent-purple) 100%)' }}
-                                onClick={async () => {
-                                  try {
-                                    setError(null);
-                                    const res = await fetch('http://localhost:3001/api/scene/update', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ sceneNumber: scene.sceneNumber, description: editedDescription }),
-                                    });
-                                    const data = await res.json();
-                                    if (!res.ok) {
-                                      throw new Error(data.error || 'Failed to update description');
-                                    }
-                                    if (data.success && data.story) {
-                                      setStory(data.story);
-                                    }
-                                    setEditingDescSceneNum(null);
-                                    handleRegenerate(scene.sceneNumber, 'image');
-                                  } catch (err: any) {
-                                    setError(err.message || 'Failed to update description.');
-                                  }
-                                }}
-                              >
-                                Save &amp; Regen Image
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="script-text">
-                            {scene.description || <span style={{ color: '#475569', fontStyle: 'italic' }}>No action description defined.</span>}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Script text & edit options */}
-                      <div className="script-box">
-                        <div className="script-label-row">
-                          <span className="script-label">Dialogue &amp; Narration</span>
-                          {!isEditing && (
-                            <button
-                              type="button"
-                              className="edit-script-btn"
-                              onClick={() => {
-                                setEditingSceneNum(scene.sceneNumber);
-                                setEditedScript(scene.script);
-                              }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M12 20h9" />
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                              </svg>
-                              Edit Script
-                            </button>
-                          )}
-                        </div>
-
-                        {isEditing ? (
-                          <>
-                            <textarea
-                              className="script-textarea"
-                              value={editedScript}
-                              onChange={(e) => setEditedScript(e.target.value)}
-                            />
-                            <div className="edit-actions-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                className="cancel-btn"
-                                onClick={() => setEditingSceneNum(null)}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                className="enhance-btn"
-                                disabled={enhancingScriptSceneNum === scene.sceneNumber}
-                                onClick={() => handleEnhanceText(scene.sceneNumber, 'script', editedScript)}
-                              >
-                                {enhancingScriptSceneNum === scene.sceneNumber ? 'Enhancing...' : 'Enhance with Ollama'}
-                              </button>
-                              <button
-                                type="button"
-                                className="save-btn"
-                                onClick={() => handleUpdateScript(scene.sceneNumber)}
-                              >
-                                Save Script
-                              </button>
-                              <button
-                                type="button"
-                                className="save-btn"
-                                style={{ background: 'linear-gradient(135deg, var(--green-accent) 0%, var(--accent-purple) 100%)' }}
-                                onClick={async () => {
-                                  try {
-                                    setError(null);
-                                    const res = await fetch('http://localhost:3001/api/scene/update', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ sceneNumber: scene.sceneNumber, script: editedScript }),
-                                    });
-                                    const data = await res.json();
-                                    if (!res.ok) {
-                                      throw new Error(data.error || 'Failed to update script');
-                                    }
-                                    if (data.success && data.story) {
-                                      setStory(data.story);
-                                    }
-                                    setEditingSceneNum(null);
-                                    handleRegenerate(scene.sceneNumber, 'video');
-                                  } catch (err: any) {
-                                    setError(err.message || 'Failed to update script.');
-                                  }
-                                }}
-                              >
-                                Save &amp; Regen Video
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <p className="script-text">
-                            {scene.script || <span style={{ color: '#475569', fontStyle: 'italic' }}>No dialog / narration script defined.</span>}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Actions grid */}
-                      <div className="card-action-footer">
-                        <button
-                          type="button"
-                          disabled={!!isRegenerating}
-                          className={`regenerate-btn image-regen-btn ${isRegenerating ? 'btn-loading' : ''}`}
-                          onClick={() => handleRegenerate(scene.sceneNumber, 'image')}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                          </svg>
-                          Regen Image
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!!isRegenerating || !scene.imagePath}
-                          className={`regenerate-btn video-regen-btn ${(isRegenerating || !scene.imagePath) ? 'btn-loading' : ''}`}
-                          onClick={() => handleRegenerate(scene.sceneNumber, 'video')}
-                          title={!scene.imagePath ? 'Generate the image first' : 'Regenerate video for this scene'}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="M23 7l-7 5 7 5V7z" />
-                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                          </svg>
-                          Regen Video
-                        </button>
-                      </div>
-
-                    </div>
-                  );
-                })}
+                {story.scenes.map((scene) => (
+                  <SceneCard
+                    key={scene.sceneNumber}
+                    scene={scene}
+                    isRegenerating={regeneratingMap[scene.sceneNumber] || null}
+                    elapsedTime={elapsedTimeMap[scene.sceneNumber] || null}
+                    handleUpdateScript={handleUpdateScript}
+                    handleUpdateDescription={handleUpdateDescription}
+                    handleEnhanceText={handleEnhanceText}
+                    handleSendSceneChat={handleSendSceneChat}
+                    handleRegenerate={handleRegenerate}
+                    getMediaUrl={getMediaUrl}
+                    setPreviewImageSceneNum={setPreviewImageSceneNum}
+                    setError={setError}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -950,186 +439,24 @@ export default function App() {
         </div>
 
         {/* Real-time Generator Console Modal Overlay */}
-        {showConsole && (
-          <div className="console-overlay">
-            <div className="console-box">
-              <div className="console-header">
-                <h3 className="console-title">
-                  <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', animationDuration: '0.8s', marginRight: '6px' }}></span>
-                  Production Pipeline Terminal Logs
-                </h3>
-                <button 
-                  type="button" 
-                  className="console-close-btn"
-                  onClick={() => setShowConsole(false)}
-                  disabled={generatorStatus === 'generating'}
-                >
-                  {generatorStatus === 'generating' ? 'Processing...' : 'Close Terminal'}
-                </button>
-              </div>
-              <div className="console-main-container" style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-                <div className="console-body" style={{ flexGrow: 2, flexShrink: 1, flexBasis: '60%', margin: 0, border: 'none', borderRadius: 0 }}>
-                  {consoleLogs.map((log, index) => (
-                    <span key={index} className={`log-${log.type}`}>
-                      {log.text}
-                    </span>
-                  ))}
-                  <div ref={consoleLogEndRef} />
-                </div>
-                
-                {/* ComfyUI Live Monitoring Column */}
-                <div className="comfy-monitor-panel" style={{
-                  flexGrow: 1,
-                  flexShrink: 0,
-                  flexBasis: '35%',
-                  borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
-                  backgroundColor: '#06070a',
-                  padding: '1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  overflowY: 'auto',
-                  boxSizing: 'border-box'
-                }}>
-                  <h4 style={{ margin: 0, color: '#a78bfa', fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    ComfyUI Monitor
-                  </h4>
-                  
-                  {comfyExecutingNode || comfyPreviewUrl || comfyProgress ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
-                      
-                      {/* Active Node Info */}
-                      <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
-                          Executing Node
-                        </span>
-                        <span style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: '600' }}>
-                          Node ID: {comfyExecutingNode || 'Finishing / Staging...'}
-                        </span>
-                      </div>
-
-                      {/* Progress bar */}
-                      {comfyProgress && (
-                        <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>
-                            <span>Sampling Progress</span>
-                            <span>{Math.round((comfyProgress.value / comfyProgress.max) * 100)}%</span>
-                          </div>
-                          <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${(comfyProgress.value / comfyProgress.max) * 100}%`,
-                              height: '100%',
-                              background: 'linear-gradient(90deg, #00b8d9, #8b66ff)',
-                              borderRadius: '3px',
-                              transition: 'width 0.1s ease'
-                            }}></div>
-                          </div>
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
-                            Step {comfyProgress.value} of {comfyProgress.max}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Live Image/Video Preview */}
-                      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '180px' }}>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-                          Live Preview Frame
-                        </span>
-                        <div style={{
-                          flexGrow: 1,
-                          backgroundColor: '#000000',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          position: 'relative'
-                        }}>
-                          {comfyPreviewUrl ? (
-                            <img
-                              src={comfyPreviewUrl}
-                              alt="ComfyUI Live Preview"
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            />
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                              <div className="spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }}></div>
-                              <span style={{ fontSize: '0.75rem' }}>Waiting for preview frame...</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1, color: '#475569', gap: '0.5rem', textAlign: 'center' }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="16" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                      </svg>
-                      <span style={{ fontSize: '0.8rem', fontWeight: '500' }}>Idle / Waiting for ComfyUI...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="console-footer">
-                <span className="console-status">
-                  Status: <strong style={{ color: generatorStatus === 'success' ? '#10b981' : generatorStatus === 'failed' ? '#ef4444' : '#a855f7', marginLeft: '4px' }}>
-                    {generatorStatus.toUpperCase()}
-                  </strong>
-                </span>
-                {generatorStatus !== 'generating' && (
-                  <button 
-                    type="button" 
-                    className="save-btn" 
-                    style={{ backgroundColor: generatorStatus === 'success' ? '#10b981' : '#64748b' }}
-                    onClick={() => setShowConsole(false)}
-                  >
-                    Done
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <ConsoleModal
+          showConsole={showConsole}
+          setShowConsole={setShowConsole}
+          consoleLogs={consoleLogs}
+          generatorStatus={generatorStatus}
+          comfyExecutingNode={comfyExecutingNode}
+          comfyPreviewUrl={comfyPreviewUrl}
+          comfyProgress={comfyProgress}
+          consoleLogEndRef={consoleLogEndRef}
+        />
 
         {/* Fullscreen Image Preview Lightbox Modal */}
-        {previewImageSceneNum !== null && story && (
-          (() => {
-            const previewScene = story.scenes.find(s => s.sceneNumber === previewImageSceneNum);
-            if (!previewScene || !previewScene.imagePath) return null;
-            return (
-              <div className="lightbox-overlay" onClick={() => setPreviewImageSceneNum(null)}>
-                <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-                  <button 
-                    type="button" 
-                    className="lightbox-close-btn" 
-                    onClick={() => setPreviewImageSceneNum(null)}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                  <img 
-                    src={getMediaUrl(previewScene.sceneNumber, previewScene.imagePath)} 
-                    alt={`Scene ${previewScene.sceneNumber}`} 
-                    className="lightbox-image"
-                  />
-                  <div className="lightbox-info">
-                    <span className="lightbox-scene-badge">Scene {previewScene.sceneNumber}</span>
-                    <p className="lightbox-desc">{previewScene.description}</p>
-                    {previewScene.script && (
-                      <p className="lightbox-script"><strong>Script:</strong> {previewScene.script}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })()
-        )}
+        <LightboxModal
+          previewImageSceneNum={previewImageSceneNum}
+          setPreviewImageSceneNum={setPreviewImageSceneNum}
+          story={story}
+          getMediaUrl={getMediaUrl}
+        />
       </main>
     </Theme>
   );

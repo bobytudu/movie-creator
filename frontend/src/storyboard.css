@@ -1051,3 +1051,118 @@
   padding-left: 0.75rem;
 }
 
+/* AI Scene Chat Editor Styles */
+.scene-chat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.01);
+  padding: 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  margin-top: 0.25rem;
+}
+
+.scene-chat-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.scene-chat-input {
+  width: 100%;
+  background-color: #0d0e14;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 0.65rem 2.25rem 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.scene-chat-input:focus {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 0 2px rgba(139, 102, 255, 0.15);
+}
+
+.scene-chat-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.scene-chat-send-btn {
+  position: absolute;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.scene-chat-send-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.scene-chat-send-btn:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Manual Merge Button styling */
+.merge-action-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(139, 102, 255, 0.2);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.merge-action-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 102, 255, 0.3);
+}
+
+.merge-action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.merge-action-btn:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.spinner-mini {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-left-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
