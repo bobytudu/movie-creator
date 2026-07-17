@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@langchain/langgraph": "^1.4.7",
+    "@socket.io/bun-engine": "^0.1.1",
     "dotenv": "^17.4.2",
-    "ollama": "^0.6.3"
+    "ollama": "^0.6.3",
+    "socket.io": "^4.8.3"
   }
 }

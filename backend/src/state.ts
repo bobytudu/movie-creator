@@ -26,6 +26,7 @@ export interface Scene {
   voiceover?: string;   // Narration script for voice generation
   bgmPrompt?: string;   // Prompt for music generator (tempo, genre, instruments, mood)
   sfx?: string[];       // Sound effects in this scene
+  sameCameraAngle?: boolean; // Whether the scene has the exact same camera angle as the previous one
 }
 
 // LangGraph state annotation defining which fields can be modified.

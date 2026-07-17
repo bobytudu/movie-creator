@@ -27,17 +27,63 @@ function logError(text: string, err?: any) {
 async function main() {
   logHeader("ISOLATED VIDEO MERGE UTILITY");
 
+  const manifestPath = path.resolve(process.cwd(), "story_output_assets.json");
+  logInfo(`Loading manifest: ${manifestPath}`);
+
+  let storyData: any;
+  try {
+    const content = await fs.readFile(manifestPath, "utf-8");
+    storyData = JSON.parse(content);
+  } catch (err: any) {
+    logError(`Failed to read/parse manifest: ${err.message}`);
+    process.exit(1);
+  }
+
+  if (!storyData.scenes || !Array.isArray(storyData.scenes)) {
+    logError("Invalid manifest structure: scenes array not found.");
+    process.exit(1);
+  }
+
+  // Sort scenes by sceneNumber
+  const scenes = [...storyData.scenes].sort((a: any, b: any) => (a.sceneNumber || 0) - (b.sceneNumber || 0));
+
+  const absoluteVideoPaths: string[] = [];
+  logInfo(`Scanning scenes from manifest:`);
+  for (const scene of scenes) {
+    if (scene.videoPath) {
+      const absPath = path.resolve(scene.videoPath);
+      try {
+        await fs.access(absPath);
+        absoluteVideoPaths.push(absPath);
+        console.log(`  - Scene ${scene.sceneNumber}: Found video at ${scene.videoPath}`);
+      } catch {
+        logWarning(`  - Scene ${scene.sceneNumber}: Video file not found at ${absPath}`);
+      }
+    } else {
+      logWarning(`  - Scene ${scene.sceneNumber}: No videoPath specified in manifest.`);
+    }
+  }
+
+  if (absoluteVideoPaths.length === 0) {
+    logWarning("No valid video files found from the manifest.");
+    process.exit(0);
+  }
+
   let targetFolderArg = process.env.output_dir ? `${process.env.output_dir}/video` : undefined;
   if (!targetFolderArg) {
     targetFolderArg = process.argv[2];
   }
-  if (!targetFolderArg) {
+
+  let targetFolder = targetFolderArg ? path.resolve(targetFolderArg) : undefined;
+  if (!targetFolder && absoluteVideoPaths.length > 0) {
+    targetFolder = path.dirname(absoluteVideoPaths[0]!);
+  }
+
+  if (!targetFolder) {
     logError("No target folder path provided.");
-    console.log("\nUsage:\n  bun src/merge_videos.ts <folder_path> [output_file_name]");
     process.exit(1);
   }
 
-  const targetFolder = path.resolve(targetFolderArg);
   const outputFileName = process.argv[3] || "merged_output.mp4";
   const finalOutputPath = path.join(targetFolder, outputFileName);
 
@@ -51,50 +97,15 @@ async function main() {
       throw new Error("Path is not a directory");
     }
   } catch (err: any) {
-    logError(`Target path is not a valid directory: ${targetFolder}`);
-    process.exit(1);
-  }
-
-  // Read all files in the directory
-  let files: string[];
-  try {
-    files = await fs.readdir(targetFolder);
-  } catch (err: any) {
-    logError(`Failed to read directory contents: ${err.message}`);
-    process.exit(1);
-  }
-
-  // Filter and parse sequential files ending in \d+_\.mp4
-  const regex = /(\d+)_\.mp4$/i;
-  const videoFiles = files
-    .map((name) => {
-      const match = name.match(regex);
-      return {
-        name,
-        num: match && match[1] ? parseInt(match[1], 10) : null,
-      };
-    })
-    .filter((f): f is { name: string; num: number } => f.num !== null);
-
-  if (videoFiles.length === 0) {
-    logWarning("No video files ending with '<number>_.mp4' found in the target directory.");
-    process.exit(0);
-  }
-
-  // Sort them numerically, falling back to alphabetical for ties
-  videoFiles.sort((a, b) => {
-    if (a.num !== b.num) {
-      return a.num - b.num;
+    // Attempt to create target directory if it doesn't exist
+    try {
+      await fs.mkdir(targetFolder, { recursive: true });
+    } catch {
+      logError(`Target path is not a valid directory and could not be created: ${targetFolder}`);
+      process.exit(1);
     }
-    return a.name.localeCompare(b.name);
-  });
+  }
 
-  logInfo(`Found ${videoFiles.length} sequential videos to merge:`);
-  videoFiles.forEach((f) => {
-    console.log(`  - ${f.name} (Index: ${f.num})`);
-  });
-
-  const absoluteVideoPaths = videoFiles.map((f) => path.join(targetFolder, f.name));
   const tempFilePath = path.join(targetFolder, "temp_merge_list.txt");
 
   try {

@@ -1,21 +1,30 @@
 import { serve } from "bun";
+
 import * as fs from "fs/promises";
 import * as path from "path";
 import { spawn } from "child_process";
 import { config } from "dotenv";
-import { callOllama } from "./src/config.ts";
+import { Server as SocketIOServer } from "socket.io";
+import { Server as BunEngine } from "@socket.io/bun-engine";
+import { callOllama, loadAppConfig } from "./src/config.ts";
+import {
+  checkComfyReachable,
+  generateImageForScene,
+  generateVideoForScene,
+  COMFYUI_URL,
+  outputDir,
+  areScenesConnected,
+  extractLastFrame,
+} from "./src/comfy_service.ts";
+import { runVideoMerge } from "./src/video_service.ts";
 
 config(); // Load environment variables
 
 const PORT = 3001;
-const COMFYUI_URL = process.env.COMFYUI_URL || "http://127.0.0.1:8188";
-const outputDir = process.env.output_dir || "";
 
-// Absolute paths to JSON manifests and templates
+// Absolute paths to JSON manifests
 const storyAssetsPath = path.resolve(process.cwd(), "story_output_assets.json");
 const storyPath = path.resolve(process.cwd(), "story_output.json");
-const imageTemplatePath = path.resolve(process.cwd(), "workflow", "image_flux2_text_to_image.json");
-const videoTemplatePath = path.resolve(process.cwd(), "workflow", "video_ltx2_3_i2v.json");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,219 +32,117 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-/**
- * Checks if ComfyUI is reachable
- */
-async function checkComfyReachable(): Promise<boolean> {
+// Initialize Socket.io server and bind it to Bun Engine
+const io = new SocketIOServer({
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+const engine = new BunEngine({
+  path: "/socket.io/",
+});
+io.bind(engine);
+
+io.on("connection", (socket) => {
+  const clientId = (socket.handshake.query.clientId as string) || "";
+  console.log(`[SocketIO] Client connected, clientId: ${clientId}, socketId: ${socket.id}`);
+  
+  if (!clientId) {
+    console.log(`[SocketIO] Disconnecting socket ${socket.id} due to missing clientId`);
+    socket.disconnect(true);
+    return;
+  }
+
+  const comfyWsUrl = `${COMFYUI_URL.replace(/^http/, "ws")}/ws?clientId=${clientId}`;
+  console.log(`[SocketIO] Connecting to ComfyUI WS: ${comfyWsUrl}`);
+
   try {
-    const res = await fetch(`${COMFYUI_URL}/prompt`);
-    return res.status === 405 || res.ok;
-  } catch {
-    return false;
-  }
-}
+    const comfyWs = new WebSocket(comfyWsUrl);
+    comfyWs.binaryType = "arraybuffer";
 
-/**
- * Queues workflow json to ComfyUI
- */
-async function queueWorkflow(workflow: any, clientId?: string): Promise<string> {
-  const payload: any = { prompt: workflow };
-  if (clientId) {
-    payload.client_id = clientId;
-  }
-  const response = await fetch(`${COMFYUI_URL}/prompt`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
-  }
-  const result = (await response.json()) as { prompt_id: string };
-  return result.prompt_id;
-}
+    comfyWs.onopen = () => {
+      console.log(`[SocketIO] Connected to ComfyUI WebSocket for clientId: ${clientId}`);
+    };
 
-/**
- * Polls prompt ID until completion
- */
-async function pollPromptCompletion(promptId: string): Promise<any> {
-  while (true) {
-    try {
-      const response = await fetch(`${COMFYUI_URL}/history/${promptId}`);
-      if (response.ok) {
-        const history = (await response.json()) as Record<string, any>;
-        if (history && history[promptId]) {
-          const entry = history[promptId];
-          const status = entry.status;
-          if (status) {
-            if (status.status_str === "success") {
-              return entry;
-            } else {
-              throw new Error(`ComfyUI generation failed: ${JSON.stringify(status)}`);
-            }
+    comfyWs.onmessage = (event) => {
+      if (typeof event.data === "string") {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "progress") {
+            console.log(`[SocketIO WS Progress] Node: ${msg.data?.node || ""}, Step: ${msg.data?.value || 0}/${msg.data?.max || 0}`);
+          } else if (msg.type === "executing") {
+            console.log(`[SocketIO WS Executing] Node: ${msg.data?.node || "Finished/None"}`);
+          } else if (msg.type === "status") {
+            console.log(`[SocketIO WS Status] Queue remaining: ${msg.data?.status?.exec_info?.queue_remaining ?? 0}`);
+          } else {
+            console.log(`[SocketIO WS Message] Type: ${msg.type}`, JSON.stringify(msg.data));
           }
-          return entry;
+        } catch (e) {
+          console.log(`[SocketIO WS Text Message]`, event.data);
         }
-      }
-    } catch (err: any) {
-      if (err.message && err.message.includes("ComfyUI generation failed")) {
-        throw err;
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-}
-
-/**
- * Extracts output file path from completed history entry
- */
-function extractFileFromHistory(historyEntry: any, nodeId: string): { filename: string; absolutePath: string } {
-  const nodeOutput = historyEntry.outputs?.[nodeId];
-  if (!nodeOutput) {
-    throw new Error(`Node ${nodeId} output was not found in prompt history.`);
-  }
-  const list = nodeOutput.gifs || nodeOutput.videos || nodeOutput.images || nodeOutput.filenames || [];
-  if (list.length === 0) {
-    throw new Error(`Node ${nodeId} did not output any files.`);
-  }
-  const item = list[0];
-  const filename = typeof item === "string" ? item : item.filename;
-  const subfolder = typeof item === "string" ? "" : (item.subfolder || "");
-  const relativePath = subfolder ? path.join(subfolder, filename) : filename;
-  const absolutePath = outputDir ? path.join(outputDir, relativePath) : path.resolve(relativePath);
-  return {
-    filename,
-    absolutePath: absolutePath.replace(/\\/g, "/"),
-  };
-}
-
-/**
- * Triggers video merge script (merge_videos.ts)
- */
-async function runVideoMerge(): Promise<void> {
-  console.log("[Server] Running video merge script...");
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn("bun", ["src/merge_videos.ts"], { stdio: "inherit", shell: true });
-    child.on("close", (code) => {
-      if (code === 0) {
-        console.log("[Server] Video merge successfully completed.");
-        resolve();
       } else {
-        reject(new Error(`Video merge exited with code ${code}`));
+        const len = event.data instanceof ArrayBuffer ? event.data.byteLength : (event.data as any).size || 0;
+        console.log(`[SocketIO WS Binary Message] size: ${len} bytes`);
+      }
+      
+      // Emit event.data to the frontend client
+      socket.emit("message", event.data);
+    };
+
+    comfyWs.onerror = (err) => {
+      console.error(`[SocketIO] ComfyUI WS error for clientId: ${clientId}`, err);
+    };
+
+    comfyWs.onclose = () => {
+      console.log(`[SocketIO] ComfyUI WS closed for clientId: ${clientId}`);
+      socket.disconnect(true);
+    };
+
+    socket.on("message", (message) => {
+      if (comfyWs.readyState === WebSocket.OPEN) {
+        comfyWs.send(message);
       }
     });
-    child.on("error", reject);
-  });
-}
 
-/**
- * Standard text-to-image Flux2 generation for a single scene
- */
-async function generateImageForScene(scene: any, style: string, width: number, height: number, clientId?: string): Promise<string> {
-  const imageWorkflowContent = await fs.readFile(imageTemplatePath, "utf-8");
-  const imageWorkflow = JSON.parse(imageWorkflowContent);
+    socket.on("disconnect", () => {
+      console.log(`[SocketIO] Client disconnected: ${socket.id}, closing ComfyUI WS`);
+      if (comfyWs.readyState === WebSocket.OPEN || comfyWs.readyState === WebSocket.CONNECTING) {
+        comfyWs.close();
+      }
+    });
 
-  // Set resolution
-  if (imageWorkflow["98:48"]?.inputs) {
-    imageWorkflow["98:48"].inputs.width = width;
-    imageWorkflow["98:48"].inputs.height = height;
+  } catch (err) {
+    console.error(`[SocketIO] Failed to connect to ComfyUI WS for clientId: ${clientId}`, err);
+    socket.disconnect(true);
   }
-  if (imageWorkflow["98:47"]?.inputs) {
-    imageWorkflow["98:47"].inputs.width = width;
-    imageWorkflow["98:47"].inputs.height = height;
-  }
+});
 
-  // Set positive prompt text
-  if (imageWorkflow["98:6"]?.inputs) {
-    imageWorkflow["98:6"].inputs.text = scene.imagePrompt;
-  } else {
-    throw new Error("Could not find positive prompt node '98:6' in image workflow.");
-  }
-
-  // Randomize seed
-  if (imageWorkflow["98:25"]?.inputs) {
-    imageWorkflow["98:25"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
-  }
-
-  console.log(`[Server] Generating image for scene ${scene.sceneNumber}...`);
-  const promptId = await queueWorkflow(imageWorkflow, clientId);
-  const history = await pollPromptCompletion(promptId);
-  const result = extractFileFromHistory(history, "9");
-  return result.absolutePath;
-}
-
-/**
- * Image-to-video LTX2.3 generation for a single scene
- */
-async function generateVideoForScene(scene: any, style: string, width: number, height: number, clientId?: string): Promise<string> {
-  const videoWorkflowContent = await fs.readFile(videoTemplatePath, "utf-8");
-  const videoWorkflow = JSON.parse(videoWorkflowContent);
-
-  // Set resolution
-  if (videoWorkflow["320:312"]?.inputs) {
-    videoWorkflow["320:312"].inputs.value = width;
-  } else {
-    throw new Error("Could not find width node '320:312' in video workflow.");
-  }
-  if (videoWorkflow["320:299"]?.inputs) {
-    videoWorkflow["320:299"].inputs.value = height;
-  } else {
-    throw new Error("Could not find height node '320:299' in video workflow.");
-  }
-
-  // Set input image path
-  if (videoWorkflow["269"]?.inputs) {
-    videoWorkflow["269"].inputs.image = scene.imagePath;
-  } else {
-    throw new Error("Could not find LoadImage node '269' in video workflow.");
-  }
-
-  // Set positive prompt text (script/dialogue + realistic camera modifiers)
-  let videoPrompt = scene.script 
-    ? `${scene.imagePrompt}\n\nAudio/Dialogue:\n${scene.script}`
-    : scene.voiceover
-      ? `${scene.imagePrompt}\n\nAudio/Dialogue:\n${scene.voiceover}`
-      : scene.imagePrompt;
-
-  videoPrompt += "\n\nRealistic, natural, lifelike movement speed for all characters and animals. They move naturally at real-time speeds, behave like living beings with realistic weight and physics. Camera movement is a handheld camera look, realistic lens breathing, natural subtle camera shake, professional documentary camera operator feel.";
-
-  if (videoWorkflow["320:319"]?.inputs) {
-    videoWorkflow["320:319"].inputs.value = videoPrompt;
-  } else {
-    throw new Error("Could not find prompt value node '320:319' in video workflow.");
-  }
-
-  // Set duration
-  const duration = scene.duration || 6;
-  if (videoWorkflow["320:301"]?.inputs) {
-    videoWorkflow["320:301"].inputs.value = duration;
-  } else {
-    throw new Error("Could not find duration node '320:301' in video workflow.");
-  }
-
-  // Randomize video seeds
-  if (videoWorkflow["320:276"]?.inputs) {
-    videoWorkflow["320:276"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
-  }
-  if (videoWorkflow["320:277"]?.inputs) {
-    videoWorkflow["320:277"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
-  }
-
-  console.log(`[Server] Generating video for scene ${scene.sceneNumber}...`);
-  const promptId = await queueWorkflow(videoWorkflow, clientId);
-  const history = await pollPromptCompletion(promptId);
-  const result = extractFileFromHistory(history, "75");
-  return result.absolutePath;
-}
+const { websocket } = engine.handler();
 
 // Start Server
 serve({
   port: PORT,
   idleTimeout: 255, // 255 seconds max supported by Bun
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
     const pathname = url.pathname;
+
+    // Handle Socket.IO connection requests
+    if (pathname.startsWith("/socket.io/")) {
+      return engine.handleRequest(req, server);
+    }
+
+    // Commented out native WebSocket upgrade request
+    /*
+    if (pathname === "/ws") {
+      const clientId = url.searchParams.get("clientId") || url.searchParams.get("client_id") || "";
+      const success = server.upgrade(req, {
+        data: { clientId }
+      });
+      if (success) return undefined; // Handled by Bun WebSocket server
+    }
+    */
 
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
@@ -366,9 +273,9 @@ Do not describe camera angles or technical camera terms here, just focus on the 
 Return ONLY the raw enhanced description. Do not add explanations, intro text, markdown formatting, or JSON. Just return the enhanced text.`;
         } else if (type === "script") {
           systemPrompt = `You are a professional screenwriter.
-Your task is to take an existing dialogue or narration script and enhance it to make it more natural, engaging, and dialogue-appropriate for the scene.
-Ensure it is written in speaker format, e.g. [Character Name]: Dialogue. Or [Narrator]: Dialogue/Text.
-Keep it extremely short and concise (at most 1-2 short sentences, maximum 15 words) so that it can be spoken in under 5-8 seconds.
+Your task is to take an existing dialogue script and enhance it to make it more natural, engaging, and dialogue-appropriate for the scene.
+Ensure it is written in speaker format, e.g. [Character Name]: Dialogue. Do NOT use narrator voice/narration. ONLY characters should speak.
+Keep it brief and dialogue-appropriate (at most 2-3 short sentences, maximum 30 words) so that it can be spoken in under 6 to 16 seconds.
 Return ONLY the raw enhanced script. Do not add explanations, intro text, markdown formatting, or JSON. Just return the enhanced text.`;
         } else {
           return new Response(JSON.stringify({ error: `Invalid type: ${type}` }), {
@@ -432,9 +339,9 @@ You will be given:
 3. The current details of a specific scene (Setting, Visual Action Description, and Dialogue/Narration Script).
 4. An instruction from the user specifying modifications they want to make to this specific scene (e.g. adding objects, modifying actions, changing dialogue).
 
-Your task is to modify the scene's Visual Action Description and/or Dialogue/Narration Script to incorporate the user's requested instruction while maintaining consistency with characters, setting, and style.
+Your task is to modify the scene's Visual Action Description and/or Dialogue Script to incorporate the user's requested instruction while maintaining consistency with characters, setting, and style.
 Keep the updated Visual Action Description detailed but concise.
-Keep the updated Dialogue/Narration Script extremely short (under 15 words) and formatted as speaker lines like [Character Name]: Dialogue or [Narrator]: Narration.
+Keep the updated Dialogue Script brief (under 30 words), ensuring that only characters speak (do NOT use narrator voice/narration), and format it as speaker lines like [Character Name]: Dialogue.
 
 You must output a JSON object adhering strictly to this schema:
 {
@@ -525,7 +432,9 @@ CRITICAL Instructions:
       // 3. POST /api/scene/regenerate
       if (req.method === "POST" && pathname === "/api/scene/regenerate") {
         const body = (await req.json()) as any;
-        const { sceneNumber, type, clientId } = body; // type is 'image' | 'video' | 'both'
+        const sceneNumber = body.sceneNumber;
+        const type = body.type;
+        const clientId = body.clientId || body.client_id || "";
         if (sceneNumber === undefined || !type) {
           return new Response(JSON.stringify({ error: "Missing sceneNumber or type" }), {
             status: 400,
@@ -556,20 +465,8 @@ CRITICAL Instructions:
           });
         }
 
-        // Get application resolution settings from config.json
-        let configData = { style: "realistic", width: 1280, height: 720 };
-        try {
-          const confContent = await fs.readFile(path.resolve(process.cwd(), "config.json"), "utf-8");
-          const parsed = JSON.parse(confContent);
-          configData.style = parsed.style || configData.style;
-          if (parsed.resolution) {
-            const match = parsed.resolution.match(/^(\d+)x(\d+)$/i);
-            if (match && match[1] && match[2]) {
-              configData.width = parseInt(match[1], 10);
-              configData.height = parseInt(match[2], 10);
-            }
-          }
-        } catch {}
+        // Get application resolution settings
+        const configData = loadAppConfig();
 
         let regeneratedImage = false;
         let regeneratedVideo = false;
@@ -593,6 +490,24 @@ CRITICAL Instructions:
           const newVideoPath = await generateVideoForScene(scene, configData.style, configData.width, configData.height, clientId);
           scene.videoPath = newVideoPath;
           regeneratedVideo = true;
+
+          // Check if next scene is connected and update its start frame
+          const idx = storyData.scenes.findIndex((s: any) => s.sceneNumber === sceneNumber);
+          if (idx !== -1 && idx + 1 < storyData.scenes.length) {
+            const nextScene = storyData.scenes[idx + 1];
+            if (areScenesConnected(nextScene, scene)) {
+              try {
+                console.log(`[Server] Next scene ${nextScene.sceneNumber} is connected. Updating its start frame from the new video last frame...`);
+                const videoDir = path.dirname(newVideoPath);
+                const extFramePath = path.join(videoDir, `scene_${nextScene.sceneNumber}_start_frame.png`).replace(/\\/g, "/");
+                await extractLastFrame(newVideoPath, extFramePath);
+                nextScene.imagePath = extFramePath;
+                console.log(`[Server] Extracted and updated next scene imagePath: ${extFramePath}`);
+              } catch (err: any) {
+                console.error(`[Server] Failed to extract last frame for next scene: ${err.message}`);
+              }
+            }
+          }
         }
 
         // Write assets back to disk
@@ -606,6 +521,19 @@ CRITICAL Instructions:
           if (mainScene) {
             if (regeneratedImage) mainScene.imagePath = scene.imagePath;
             if (regeneratedVideo) mainScene.videoPath = scene.videoPath;
+            
+            // Sync next scene imagePath if updated
+            const idx = storyData.scenes.findIndex((s: any) => s.sceneNumber === sceneNumber);
+            if (idx !== -1 && idx + 1 < storyData.scenes.length) {
+              const nextScene = storyData.scenes[idx + 1];
+              if (areScenesConnected(nextScene, scene)) {
+                const mainNextScene = mainStory.scenes.find((s: any) => s.sceneNumber === nextScene.sceneNumber);
+                if (mainNextScene) {
+                  mainNextScene.imagePath = nextScene.imagePath;
+                }
+              }
+            }
+            
             await fs.writeFile(storyPath, JSON.stringify(mainStory, null, 2), "utf-8");
           }
         } catch {}
@@ -649,7 +577,7 @@ CRITICAL Instructions:
       if (req.method === "GET" && pathname === "/api/generate/stream") {
         const topic = url.searchParams.get("topic") || "";
         const style = url.searchParams.get("style") || "";
-        const clientId = url.searchParams.get("clientId") || "";
+        const clientId = url.searchParams.get("clientId") || url.searchParams.get("client_id") || "";
 
         const args = ["index.ts"];
         if (style) {
@@ -665,10 +593,7 @@ CRITICAL Instructions:
         console.log(`[Server] Starting full generation with args: ${args.join(" ")}`);
 
         // Spawn bun index.ts process
-        const child = spawn("bun", args, {
-          stdout: "pipe",
-          stderr: "pipe",
-        });
+        const child = spawn("bun", args);
 
         const stream = new ReadableStream({
           start(controller) {
@@ -769,6 +694,83 @@ CRITICAL Instructions:
       });
     }
   },
+  /*
+  websocket: {
+    open(ws: ServerWebSocket<WebSocketData>) {
+      const clientId = ws.data?.clientId || "";
+      console.log(`[Proxy] Client connected, clientId: ${clientId}`);
+      
+      const comfyWsUrl = `${COMFYUI_URL.replace(/^http/, "ws")}/ws?clientId=${clientId}`;
+      console.log(`[Proxy] Connecting to ComfyUI WS: ${comfyWsUrl}`);
+      
+      try {
+        const comfyWs = new WebSocket(comfyWsUrl);
+        comfyWs.binaryType = "arraybuffer";
+        
+        comfyWs.onopen = () => {
+          console.log(`[Proxy] Connected to ComfyUI WebSocket for clientId: ${clientId}`);
+        };
+
+        comfyWs.addEventListener('progress ', (event) => {
+          console.log(`------------------------------------`, event);
+        });
+        
+        comfyWs.onmessage = (event) => {
+          if (typeof event.data === "string") {
+            try {
+              const msg = JSON.parse(event.data);
+              if (msg.type === "progress") {
+                console.log(`[Proxy WS Progress] Node: ${msg.data?.node || ""}, Step: ${msg.data?.value || 0}/${msg.data?.max || 0}`);
+              } else if (msg.type === "executing") {
+                console.log(`[Proxy WS Executing] Node: ${msg.data?.node || "Finished/None"}`);
+              } else if (msg.type === "status") {
+                console.log(`[Proxy WS Status] Queue remaining: ${msg.data?.status?.exec_info?.queue_remaining ?? 0}`);
+              } else {
+                console.log(`[Proxy WS Message] Type: ${msg.type}`, JSON.stringify(msg.data));
+              }
+            } catch (e) {
+              console.log(`[Proxy WS Text Message]`, event.data);
+            }
+          } else {
+            const len = event.data instanceof ArrayBuffer ? event.data.byteLength : (event.data as any).size || 0;
+            console.log(`[Proxy WS Binary Message] size: ${len} bytes`);
+          }
+          ws.send(event.data);
+        };
+        
+        comfyWs.onerror = (err) => {
+          console.error(`[Proxy] ComfyUI WS error for clientId: ${clientId}`, err);
+        };
+        
+        comfyWs.onclose = () => {
+          console.log(`[Proxy] ComfyUI WS closed for clientId: ${clientId}`);
+          ws.close();
+        };
+        
+        if (ws.data) {
+          ws.data.comfyWs = comfyWs;
+        }
+      } catch (err) {
+        console.error(`[Proxy] Failed to connect to ComfyUI WS for clientId: ${clientId}`, err);
+        ws.close();
+      }
+    },
+    message(ws: ServerWebSocket<WebSocketData>, message) {
+      const comfyWs = ws.data?.comfyWs;
+      if (comfyWs && comfyWs.readyState === WebSocket.OPEN) {
+        comfyWs.send(message);
+      }
+    },
+    close(ws: ServerWebSocket<WebSocketData>) {
+      console.log(`[Proxy] Client disconnected, closing ComfyUI WebSocket`);
+      const comfyWs = ws.data?.comfyWs;
+      if (comfyWs) {
+        comfyWs.close();
+      }
+    }
+  }
+  */
+  websocket
 });
 
 console.log(`[Server] Bun story assets editor backend listening on port ${PORT}...`);

@@ -11,12 +11,13 @@ Your job is to take a story topic/premise and create a structured, compelling st
 The overall visual style of the story is: ${state.style || "realistic"}. Design the premise and scenes to match this style's characteristics.
 
 CRITICAL INSTRUCTIONS FOR SCENE STRUCTURE AND DURATION:
-1. Every scene in the outline represents a single short camera cut/shot, and MUST NOT be longer than 5 to 8 seconds (maximum 10 seconds absolute limit).
-2. To keep scenes under 8-10 seconds, a person must not speak continuously or perform actions for too long in a single scene.
-3. You MUST cut/split the action or conversation:
+1. Every scene in the outline represents a single short camera cut/shot, and can be from 6 to 16 seconds.
+2. Only characters should speak; do NOT use narrator voice/narration.
+3. To keep scenes under 16 seconds, a person must not speak continuously or perform actions for too long in a single scene.
+4. You MUST cut/split the action or conversation:
    - When a character is speaking, dedicate a short scene/shot to that character speaking.
    - When nobody is speaking, or between lines of dialogue, dedicate a separate shot focusing on other areas of the scene (e.g., reaction shots focusing on another character's face, or focusing on the surroundings/environment) to look realistic.
-4. Ensure the story is detailed by generating a sequence of 10 to 18 short scenes/shots (cuts) rather than a few long scenes.
+5. Ensure the story is detailed by generating a sequence of 10 to 18 short scenes/shots (cuts) rather than a few long scenes.
 
 Generate a JSON object that strictly adheres to this structure:
 {

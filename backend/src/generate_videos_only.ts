@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { config } from "dotenv";
 import { loadAppConfig } from "./config.ts";
+import { areScenesConnected, extractLastFrame } from "./comfy_service.ts";
 
 config();
 const execAsync = promisify(exec);
@@ -245,6 +246,27 @@ async function main() {
     const scene = storyData.scenes[idx];
     const sceneNum = scene.sceneNumber || (idx + 1);
 
+    const isSameSceneGroup = idx > 0 && areScenesConnected(scene, storyData.scenes[idx - 1]);
+
+    if (isSameSceneGroup) {
+      const prevScene = storyData.scenes[idx - 1];
+      if (prevScene.videoPath) {
+        try {
+          await fs.access(prevScene.videoPath);
+          logInfo(`Scene ${sceneNum} is connected to Scene ${prevScene.sceneNumber}. Extracting start frame from last frame of previous video: ${prevScene.videoPath}`);
+          
+          const videoDir = path.dirname(prevScene.videoPath);
+          const extFramePath = path.join(videoDir, `scene_${sceneNum}_start_frame.png`).replace(/\\/g, "/");
+          
+          await extractLastFrame(prevScene.videoPath, extFramePath);
+          scene.imagePath = extFramePath;
+          logSuccess(`Extracted last frame to: ${extFramePath}`);
+        } catch (err: any) {
+          logError(`Failed to extract last frame for scene ${sceneNum}: ${err.message}. Using existing image.`);
+        }
+      }
+    }
+
     const imagePath = scene.imagePath;
     if (!imagePath) {
       logWarning(`Scene ${sceneNum} has no imagePath. Video generation requires an input image. Skipping.`);
@@ -311,8 +333,9 @@ async function main() {
           ? `${imagePrompt}\n\nAudio/Dialogue:\n${scene.voiceover}`
           : imagePrompt;
 
-      // Add realistic movement modifiers
+      // Add realistic movement modifiers and requested suffix
       videoPrompt += "\n\nRealistic, natural, lifelike movement speed for all characters and animals. They move naturally at real-time speeds, behave like living beings with realistic weight and physics. Camera movement is a handheld camera look, realistic lens breathing, natural subtle camera shake, professional documentary camera operator feel.";
+      videoPrompt += "\n\nadd some movement in the video/scene, characters, objects camera movements etc,";
 
       logInfo(`Video Prompt (with script): "${videoPrompt.substring(0, 100)}..."`);
 

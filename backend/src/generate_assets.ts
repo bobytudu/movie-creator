@@ -3,6 +3,7 @@ import * as path from "path";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { loadAppConfig, callOllama } from "./config.ts";
+import { getBaseDescription, areScenesConnected, extractLastFrame } from "./comfy_service.ts";
 
 const execAsync = promisify(exec);
 
@@ -12,11 +13,12 @@ const outputDir = process.env.output_dir || "";
 let clientId = "";
 const runArgs = process.argv.slice(2);
 for (let i = 0; i < runArgs.length; i++) {
-  if (runArgs[i] === "--clientId" && i + 1 < runArgs.length) {
+  if ((runArgs[i] === "--clientId" || runArgs[i] === "--client_id") && i + 1 < runArgs.length) {
     clientId = runArgs[i + 1] ?? "";
     break;
   }
 }
+console.log(`[generate_assets.ts] Initializing with ComfyUI client_id: "${clientId || "none"}"`);
 
 // Standard styling helper
 function logHeader(text: string) {
@@ -198,8 +200,8 @@ async function main() {
   const appConfig = loadAppConfig();
   logInfo(`Configuration - Style: "${appConfig.style}", Resolution: ${appConfig.width}x${appConfig.height}`);
 
-  const inputFileName = "C:/personal_projects/workflow/story_output.json"
-  const inputFilePath = path.resolve(inputFileName);
+  const inputFileName = path.resolve(process.cwd(), "story_output.json");
+  const inputFilePath = inputFileName;
   
   const outputFileName = inputFileName.endsWith(".json")
     ? inputFileName.substring(0, inputFileName.length - 5) + "_assets.json"
@@ -272,27 +274,19 @@ async function main() {
     process.exit(1);
   }
 
-  // Helper to get base description by stripping (Part X)
-  function getBaseDescription(desc: string): string {
-    return desc.replace(/\s*\(Part\s+\d+\)$/i, "").trim();
-  }
-
   // Pre-pass simulation to calculate queue size and total images to generate
   let totalImagesToGenerate = 0;
-  let simulatedBaseIdx = -1;
-  const simulatedImagePaths = new Map<number, string>(); // index -> dummy path to simulate existence
 
   for (let idx = 0; idx < storyData.scenes.length; idx++) {
     const scene = storyData.scenes[idx];
     const imagePrompt = scene.imagePrompt;
     if (!imagePrompt) continue;
 
-    const isSameSceneGroup = idx > 0 &&
-      scene.setting === storyData.scenes[idx - 1].setting &&
-      getBaseDescription(scene.description) === getBaseDescription(storyData.scenes[idx - 1].description);
+    const isSameSceneGroup = idx > 0 && areScenesConnected(scene, storyData.scenes[idx - 1]);
 
-    if (!isSameSceneGroup) {
-      simulatedBaseIdx = idx;
+    if (isSameSceneGroup) {
+      // Connected scene: start frame will be extracted from previous video
+      continue;
     }
 
     // Check if the current scene already has a valid image
@@ -305,170 +299,22 @@ async function main() {
     }
 
     if (hasValidImage) {
-      simulatedImagePaths.set(idx, scene.imagePath);
       continue;
     }
 
-    if (isSameSceneGroup && simulatedBaseIdx !== -1) {
-      // We do not reuse images. If the prompt is the same, we generate a new angle variation and edit.
-      totalImagesToGenerate++;
-      simulatedImagePaths.set(idx, "edit");
-    } else {
-      // First in group, will call ComfyUI text-to-image
-      totalImagesToGenerate++;
-      simulatedImagePaths.set(idx, "text2img");
-    }
+    totalImagesToGenerate++;
   }
 
   logInfo(`Total images that need to be generated via ComfyUI: ${totalImagesToGenerate}`);
 
-  // 1. GENERATE IMAGES FOR ALL SCENES
-  logHeader("GENERATING IMAGES FOR ALL SCENES");
-  
-  let baseSceneIdx = -1;
+  // Helper for Flux Text-to-Image generation
   let currentImageNum = 0;
-
-  for (let idx = 0; idx < storyData.scenes.length; idx++) {
-    const scene = storyData.scenes[idx];
-    const sceneNum = scene.sceneNumber || (idx + 1);
-
-    let imagePrompt = scene.imagePrompt;
-    if (!imagePrompt) {
-      logWarning(`Scene ${sceneNum} has no imagePrompt. Skipping image generation.`);
-      continue;
-    }
-
-    // Determine if this scene is part of the same scene group as the previous one
-    const isSameSceneGroup = idx > 0 &&
-      scene.setting === storyData.scenes[idx - 1].setting &&
-      getBaseDescription(scene.description) === getBaseDescription(storyData.scenes[idx - 1].description);
-
-    if (!isSameSceneGroup) {
-      baseSceneIdx = idx;
-    }
-
-    // Check if the current scene already has a valid image
-    let hasValidImage = false;
-    if (scene.imagePath) {
-      try {
-        await fs.access(scene.imagePath);
-        hasValidImage = true;
-      } catch {
-        // Image doesn't exist on disk, we need to generate/reuse
-      }
-    }
-
-    if (hasValidImage) {
-      logInfo(`Scene ${sceneNum} already has a generated image at: ${scene.imagePath}. Skipping.`);
-      continue;
-    }
-
-    // If it's in the same scene group, we check if we can reuse or need to generate using image edit
-    if (isSameSceneGroup && baseSceneIdx !== -1) {
-      const baseScene = storyData.scenes[baseSceneIdx]!;
-
-      // If current imagePrompt is exactly the same as the base scene's imagePrompt:
-      // generate a new camera angle/framing for it
-      if (imagePrompt.trim() === baseScene.imagePrompt.trim()) {
-        logInfo(`Scene ${sceneNum} has the same prompt as base Scene ${baseScene.sceneNumber}. Generating a different camera angle...`);
-        imagePrompt = await generateAngleVariation(imagePrompt, appConfig.style);
-        scene.imagePrompt = imagePrompt;
-        await fs.writeFile(finalOutputPath, JSON.stringify(storyData, null, 2), "utf-8");
-      }
-
-      // Ensure the base scene has a valid image path. If not, generate/locate it first.
-      let baseImagePath = baseScene.imagePath;
-      let baseImageValid = false;
-      if (baseImagePath) {
-        try {
-          await fs.access(baseImagePath);
-          baseImageValid = true;
-        } catch {}
-      }
-
-      if (baseImageValid) {
-
-        // If the prompt is different, we use the image edit workflow!
-        currentImageNum++;
-        const queueRemaining = totalImagesToGenerate - currentImageNum;
-        logHeader(`[${currentImageNum}/${totalImagesToGenerate} image] GENERATING VIA IMAGE-TO-IMAGE FOR SCENE ${sceneNum}/${storyData.scenes.length}`);
-        logInfo(`Images remaining in queue: ${queueRemaining}`);
-        logInfo(`Source Base Image: ${baseImagePath}`);
-        logInfo(`Image Prompt (Angle/Edit): "${imagePrompt.substring(0, 100)}..."`);
-
-        try {
-          logInfo("Queueing image-to-image/edit generation...");
-          const editTemplatePath = path.join(process.cwd(), "workflow", "image_flux2.json");
-          const editWorkflowContent = await fs.readFile(editTemplatePath, "utf-8");
-          const editWorkflow = JSON.parse(editWorkflowContent);
-
-          // Configure custom resolution
-          if (editWorkflow["45"]?.inputs) {
-            editWorkflow["45"] = {
-              inputs: {
-                resize_type: "scale dimensions",
-                "resize_type.width": appConfig.width,
-                "resize_type.height": appConfig.height,
-                "resize_type.crop": "center",
-                scale_method: "lanczos",
-                input: [
-                  "46",
-                  0
-                ]
-              },
-              class_type: "ResizeImageMaskNode",
-              _meta: {
-                title: "Resize Image/Mask"
-              }
-            };
-          }
-
-          // Set source image in LoadImage node "46"
-          if (editWorkflow["46"]?.inputs) {
-            editWorkflow["46"].inputs.image = baseImagePath;
-          } else {
-            throw new Error("Could not find LoadImage node '46' in image edit workflow.");
-          }
-
-          // Set prompt text in CLIPTextEncode positive prompt node "68:6"
-          if (editWorkflow["68:6"]?.inputs) {
-            editWorkflow["68:6"].inputs.text = imagePrompt;
-          } else {
-            throw new Error("Could not find positive prompt node '68:6' in image edit workflow.");
-          }
-
-          // Randomize seed in RandomNoise node "68:25"
-          if (editWorkflow["68:25"]?.inputs) {
-            editWorkflow["68:25"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
-          }
-
-          const editPromptId = await queueWorkflow(editWorkflow);
-          logInfo(`Image-to-image generation queued (Prompt ID: ${editPromptId}). Waiting for completion...`);
-
-          const editHistory = await pollPromptCompletion(editPromptId);
-          const editResult = extractFileFromHistory(editHistory, "9");
-          logSuccess(`Image generated via edit workflow: ${editResult.absolutePath}`);
-
-          scene.imagePath = editResult.absolutePath;
-
-          // Save manifest progress immediately
-          await fs.writeFile(finalOutputPath, JSON.stringify(storyData, null, 2), "utf-8");
-          logInfo(`Saved progress to: ${finalOutputPath}`);
-          continue;
-        } catch (err: any) {
-          logError(`Failed to generate image-to-image for scene ${sceneNum}: ${err.message}. Falling back to standard generation.`);
-          // If edit fails, we fall through to standard generation so that we don't block the pipeline
-        }
-      } else {
-        logWarning(`Base scene ${baseScene.sceneNumber} does not have a valid image. Falling back to standard text-to-image.`);
-      }
-    }
-
+  async function generateImageFlux(scene: any, sceneNum: number) {
     currentImageNum++;
     const queueRemaining = totalImagesToGenerate - currentImageNum;
     logHeader(`[${currentImageNum}/${totalImagesToGenerate} image] GENERATING VIA TEXT-TO-IMAGE FOR SCENE ${sceneNum}/${storyData.scenes.length}`);
     logInfo(`Images remaining in queue: ${queueRemaining}`);
-    logInfo(`Image Prompt: "${imagePrompt.substring(0, 100)}..."`);
+    logInfo(`Image Prompt: "${scene.imagePrompt.substring(0, 100)}..."`);
 
     try {
       logInfo("Queueing image generation...");
@@ -489,7 +335,7 @@ async function main() {
 
       // Modify image positive prompt text
       if (imageWorkflow["98:6"]?.inputs) {
-        imageWorkflow["98:6"].inputs.text = imagePrompt;
+        imageWorkflow["98:6"].inputs.text = scene.imagePrompt;
       } else {
         throw new Error("Could not find positive prompt node '98:6' in image workflow.");
       }
@@ -507,115 +353,163 @@ async function main() {
       logSuccess(`Image generated: ${imageResult.absolutePath}`);
 
       scene.imagePath = imageResult.absolutePath;
-
-      // Save manifest progress immediately
-      await fs.writeFile(finalOutputPath, JSON.stringify(storyData, null, 2), "utf-8");
-      logInfo(`Saved progress to: ${finalOutputPath}`);
     } catch (err: any) {
       logError(`Failed to generate image for scene ${sceneNum}: ${err.message}`);
     }
   }
 
-  // 2. GENERATE VIDEOS FOR ALL SCENES
-  logHeader("GENERATING VIDEOS FOR ALL SCENES");
+  // 1. GENERATE IMAGES & VIDEOS SEQUENTIALLY PER SCENE
+  logHeader("GENERATING IMAGES AND VIDEOS FOR ALL SCENES");
+  
   for (let idx = 0; idx < storyData.scenes.length; idx++) {
     const scene = storyData.scenes[idx];
     const sceneNum = scene.sceneNumber || (idx + 1);
 
+    logHeader(`PROCESSING SCENE ${sceneNum}/${storyData.scenes.length}`);
+
+    // --- STEP 1: IMAGE SETTING/GENERATION ---
+    const imagePrompt = scene.imagePrompt;
+    if (!imagePrompt) {
+      logWarning(`Scene ${sceneNum} has no imagePrompt. Skipping asset generation.`);
+      continue;
+    }
+
+    const isSameSceneGroup = idx > 0 && areScenesConnected(scene, storyData.scenes[idx - 1]);
+
+    let hasValidImage = false;
+    if (scene.imagePath) {
+      try {
+        await fs.access(scene.imagePath);
+        hasValidImage = true;
+      } catch {}
+    }
+
+    if (!hasValidImage) {
+      if (isSameSceneGroup) {
+        // Connected scene: extract last frame of the previous video
+        const prevScene = storyData.scenes[idx - 1];
+        if (prevScene.videoPath) {
+          try {
+            await fs.access(prevScene.videoPath);
+            logInfo(`Scene ${sceneNum} is connected to Scene ${prevScene.sceneNumber}. Extracting start frame from last frame of previous video: ${prevScene.videoPath}`);
+            
+            const videoDir = path.dirname(prevScene.videoPath);
+            const extFramePath = path.join(videoDir, `scene_${sceneNum}_start_frame.png`).replace(/\\/g, "/");
+            
+            await extractLastFrame(prevScene.videoPath, extFramePath);
+            scene.imagePath = extFramePath;
+            logSuccess(`Extracted last frame to: ${extFramePath}`);
+          } catch (err: any) {
+            logError(`Failed to extract last frame for scene ${sceneNum}: ${err.message}. Falling back to standard text-to-image.`);
+            await generateImageFlux(scene, sceneNum);
+          }
+        } else {
+          logWarning(`Previous scene ${prevScene.sceneNumber} does not have a video. Falling back to standard text-to-image.`);
+          await generateImageFlux(scene, sceneNum);
+        }
+      } else {
+        // First in group or independent scene
+        await generateImageFlux(scene, sceneNum);
+      }
+      
+      // Save manifest progress immediately
+      await fs.writeFile(finalOutputPath, JSON.stringify(storyData, null, 2), "utf-8");
+    } else {
+      logInfo(`Scene ${sceneNum} already has a generated image at: ${scene.imagePath}. Skipping image generation.`);
+    }
+
+    // --- STEP 2: VIDEO GENERATION ---
     const imagePath = scene.imagePath;
     if (!imagePath) {
       logWarning(`Scene ${sceneNum} has no imagePath. Skipping video generation.`);
       continue;
     }
 
-    // Skip if video already exists
+    let hasValidVideo = false;
     if (scene.videoPath) {
       try {
         await fs.access(scene.videoPath);
-        logInfo(`Scene ${sceneNum} already has a generated video at: ${scene.videoPath}. Skipping.`);
-        continue;
-      } catch {
-        // Video path is invalid/missing, generate it
-      }
+        hasValidVideo = true;
+      } catch {}
     }
 
-    const imagePrompt = scene.imagePrompt;
-    const duration = scene.duration || 6;
+    if (!hasValidVideo) {
+      const duration = scene.duration || 6;
+      logInfo(`Queueing video generation for Scene ${sceneNum} (Duration: ${duration}s)...`);
+      try {
+        const videoWorkflowContent = await fs.readFile(videoTemplatePath, "utf-8");
+        const videoWorkflow = JSON.parse(videoWorkflowContent);
 
-    logHeader(`GENERATING VIDEO FOR SCENE ${sceneNum}/${storyData.scenes.length}`);
-    logInfo(`Duration: ${duration}s, Resolution: ${appConfig.width}x${appConfig.height}`);
+        // Set resolution if custom width/height is specified
+        if (videoWorkflow["320:312"]?.inputs) {
+          videoWorkflow["320:312"].inputs.value = appConfig.width;
+        } else {
+          throw new Error("Could not find width node '320:312' in video workflow.");
+        }
+        if (videoWorkflow["320:299"]?.inputs) {
+          videoWorkflow["320:299"].inputs.value = appConfig.height;
+        } else {
+          throw new Error("Could not find height node '320:299' in video workflow.");
+        }
 
-    try {
-      logInfo("Queueing video generation...");
-      const videoWorkflowContent = await fs.readFile(videoTemplatePath, "utf-8");
-      const videoWorkflow = JSON.parse(videoWorkflowContent);
+        // Set input image path
+        if (videoWorkflow["269"]?.inputs) {
+          videoWorkflow["269"].inputs.image = imagePath;
+        } else {
+          throw new Error("Could not find LoadImage node '269' in video workflow.");
+        }
 
-      // Set resolution if custom width/height is specified
-      if (videoWorkflow["320:312"]?.inputs) {
-        videoWorkflow["320:312"].inputs.value = appConfig.width;
-      } else {
-        throw new Error("Could not find width node '320:312' in video workflow.");
+        // Set positive prompt text
+        let videoPrompt = scene.script 
+          ? `${imagePrompt}\n\nAudio/Dialogue:\n${scene.script}`
+          : scene.voiceover
+            ? `${imagePrompt}\n\nAudio/Dialogue:\n${scene.voiceover}`
+            : imagePrompt;
+
+        // Add realistic movement modifiers and requested suffix
+        videoPrompt += "\n\nRealistic, natural, lifelike movement speed for all characters and animals. They move naturally at real-time speeds, behave like living beings with realistic weight and physics. Camera movement is a handheld camera look, realistic lens breathing, natural subtle camera shake, professional documentary camera operator feel.";
+        videoPrompt += "\n\nadd some movement in the video/scene, characters, objects camera movements etc,";
+
+        logInfo(`Video Prompt: "${videoPrompt.substring(0, 100)}..."`);
+
+        if (videoWorkflow["320:319"]?.inputs) {
+          videoWorkflow["320:319"].inputs.value = videoPrompt;
+        } else {
+          throw new Error("Could not find prompt value node '320:319' in video workflow.");
+        }
+
+        // Set duration
+        if (videoWorkflow["320:301"]?.inputs) {
+          videoWorkflow["320:301"].inputs.value = duration;
+        } else {
+          throw new Error("Could not find duration node '320:301' in video workflow.");
+        }
+
+        // Randomize video seeds
+        if (videoWorkflow["320:276"]?.inputs) {
+          videoWorkflow["320:276"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
+        }
+        if (videoWorkflow["320:277"]?.inputs) {
+          videoWorkflow["320:277"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
+        }
+
+        const videoPromptId = await queueWorkflow(videoWorkflow);
+        logInfo(`Video generation queued (Prompt ID: ${videoPromptId}). Waiting for completion...`);
+
+        const videoHistory = await pollPromptCompletion(videoPromptId);
+        const videoResult = extractFileFromHistory(videoHistory, "75");
+        logSuccess(`Video generated: ${videoResult.absolutePath}`);
+
+        scene.videoPath = videoResult.absolutePath;
+
+        // Save manifest progress immediately
+        await fs.writeFile(finalOutputPath, JSON.stringify(storyData, null, 2), "utf-8");
+        logInfo(`Saved progress to: ${finalOutputPath}`);
+      } catch (err: any) {
+        logError(`Failed to generate video for scene ${sceneNum}: ${err.message}`);
       }
-      if (videoWorkflow["320:299"]?.inputs) {
-        videoWorkflow["320:299"].inputs.value = appConfig.height;
-      } else {
-        throw new Error("Could not find height node '320:299' in video workflow.");
-      }
-
-      // Set input image path
-      if (videoWorkflow["269"]?.inputs) {
-        videoWorkflow["269"].inputs.image = imagePath;
-      } else {
-        throw new Error("Could not find LoadImage node '269' in video workflow.");
-      }
-
-      // Set positive prompt text (include script/voiceover for character dialog/speech generation)
-      let videoPrompt = scene.script 
-        ? `${imagePrompt}\n\nAudio/Dialogue:\n${scene.script}`
-        : scene.voiceover
-          ? `${imagePrompt}\n\nAudio/Dialogue:\n${scene.voiceover}`
-          : imagePrompt;
-
-      // Add realistic movement modifiers
-      videoPrompt += "\n\nRealistic, natural, lifelike movement speed for all characters and animals. They move naturally at real-time speeds, behave like living beings with realistic weight and physics. Camera movement is a handheld camera look, realistic lens breathing, natural subtle camera shake, professional documentary camera operator feel.";
-
-      logInfo(`Video Prompt (with script): "${videoPrompt.substring(0, 100)}..."`);
-
-      if (videoWorkflow["320:319"]?.inputs) {
-        videoWorkflow["320:319"].inputs.value = videoPrompt;
-      } else {
-        throw new Error("Could not find prompt value node '320:319' in video workflow.");
-      }
-
-      // Set duration
-      if (videoWorkflow["320:301"]?.inputs) {
-        videoWorkflow["320:301"].inputs.value = duration;
-      } else {
-        throw new Error("Could not find duration node '320:301' in video workflow.");
-      }
-
-      // Randomize video seeds
-      if (videoWorkflow["320:276"]?.inputs) {
-        videoWorkflow["320:276"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
-      }
-      if (videoWorkflow["320:277"]?.inputs) {
-        videoWorkflow["320:277"].inputs.noise_seed = Math.floor(Math.random() * 1000000000000000);
-      }
-
-      const videoPromptId = await queueWorkflow(videoWorkflow);
-      logInfo(`Video generation queued (Prompt ID: ${videoPromptId}). Waiting for completion...`);
-
-      const videoHistory = await pollPromptCompletion(videoPromptId);
-      const videoResult = extractFileFromHistory(videoHistory, "75");
-      logSuccess(`Video generated: ${videoResult.absolutePath}`);
-
-      scene.videoPath = videoResult.absolutePath;
-
-      // Save manifest progress immediately
-      await fs.writeFile(finalOutputPath, JSON.stringify(storyData, null, 2), "utf-8");
-      logInfo(`Saved progress to: ${finalOutputPath}`);
-    } catch (err: any) {
-      logError(`Failed to generate video for scene ${sceneNum}: ${err.message}`);
+    } else {
+      logInfo(`Scene ${sceneNum} already has a generated video at: ${scene.videoPath}. Skipping.`);
     }
   }
 

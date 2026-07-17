@@ -22,7 +22,7 @@ for (let i = 0; i < args.length; i++) {
     if (arg === "--style" && i + 1 < args.length) {
       style = args[i + 1] ?? appConfig.style;
       i++;
-    } else if (arg === "--clientId" && i + 1 < args.length) {
+    } else if ((arg === "--clientId" || arg === "--client_id") && i + 1 < args.length) {
       clientId = args[i + 1] ?? "";
       i++;
     } else {
@@ -42,6 +42,7 @@ console.log(`Topic:      "${topic}"`);
 console.log(`Style:      "${style}" (config: "${appConfig.style}")`);
 console.log(`Resolution: ${appConfig.width}x${appConfig.height}`);
 console.log(`Model:      ${OLLAMA_MODEL}`);
+console.log(`ClientId:   "${clientId || "none"}"`);
 console.log(`Output:     ${outputFile}`);
 console.log(`==================================================\x1b[0m\n`);
 

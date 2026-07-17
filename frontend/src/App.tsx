@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import './storyboard.css';
@@ -47,13 +48,116 @@ export default function App() {
   }
 
   // ComfyUI WebSocket Connection States
-  const [comfyStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
-  const [comfyExecutingNode] = useState<string | null>(null);
-  const [comfyProgress] = useState<{ value: number, max: number } | null>(null);
-  const [comfyPreviewUrl] = useState<string | null>(null);
+  const [comfyStatus, setComfyStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const [comfyExecutingNode, setComfyExecutingNode] = useState<string | null>(null);
+  const [comfyProgress, setComfyProgress] = useState<{ value: number, max: number } | null>(null);
+  const [comfyPreviewUrl, setComfyPreviewUrl] = useState<string | null>(null);
 
   // Track manual movie merging loading state
   const [mergingVideos, setMergingVideos] = useState(false);
+
+  useEffect(() => {
+    let socket: Socket | null = null;
+    let isMounted = true;
+
+    function connect() {
+      if (!isMounted) return;
+      
+      setComfyStatus('connecting');
+      const wsUrl = `http://localhost:3001`;
+      console.log(`[ComfyWS] Connecting to backend proxy via Socket.io: ${wsUrl}`);
+      
+      try {
+        socket = io(wsUrl, {
+          query: { clientId: clientIdRef.current },
+          transports: ["websocket"],
+        });
+      } catch (err) {
+        console.error('[ComfyWS] Socket creation failed:', err);
+        setComfyStatus('disconnected');
+        return;
+      }
+
+      socket.on("connect", () => {
+        if (!isMounted) return;
+        console.log('[ComfyWS] Connected successfully');
+        setComfyStatus('connected');
+      });
+
+      socket.on("disconnect", (reason) => {
+        if (!isMounted) return;
+        console.log('[ComfyWS] Connection closed:', reason);
+        setComfyStatus('disconnected');
+        setComfyExecutingNode(null);
+        setComfyProgress(null);
+        setComfyPreviewUrl(null);
+      });
+
+      socket.on("connect_error", (error) => {
+        if (!isMounted) return;
+        console.error('[ComfyWS] Connection error:', error);
+        setComfyStatus('disconnected');
+      });
+
+      socket.on("message", async (data: string | ArrayBuffer) => {
+        if (!isMounted) return;
+
+        // Handle Binary message (Preview Frames)
+        if (data instanceof ArrayBuffer) {
+          const blob = new Blob([data]);
+          const url = URL.createObjectURL(blob);
+          setComfyPreviewUrl((prevUrl) => {
+            if (prevUrl) URL.revokeObjectURL(prevUrl);
+            return url;
+          });
+          return;
+        }
+
+        // Handle Text message (JSON execution progress/status)
+        if (typeof data === "string") {
+          try {
+            const message = JSON.parse(data);
+            switch (message.type) {
+              case 'executing': {
+                const node = message.data.node;
+                setComfyExecutingNode(node);
+                if (node === null) {
+                  setComfyProgress(null);
+                  setComfyPreviewUrl(null);
+                }
+                break;
+              }
+              case 'progress': {
+                const { value, max } = message.data;
+                setComfyProgress({ value, max });
+                break;
+              }
+              case 'execution_start': {
+                setComfyProgress(null);
+                setComfyPreviewUrl(null);
+                break;
+              }
+              default:
+                break;
+            }
+          } catch (e) {
+            // Ignore parse errors for non-JSON text messages
+          }
+        }
+      });
+    }
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (socket) socket.disconnect();
+      setComfyPreviewUrl((prevUrl) => {
+        if (prevUrl) URL.revokeObjectURL(prevUrl);
+        return null;
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (consoleLogEndRef.current) {
