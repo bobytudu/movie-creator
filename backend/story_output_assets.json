@@ -1,0 +1,215 @@
+{
+  "title": "Rooted in Silence",
+  "genre": "Science Fiction / Survival Horror",
+  "premise": "A survey team's rover crashes on an uncharted exoplanet, stranding them in a valley of hyper-reactive flora. As they attempt a desperate trek to high ground for extraction, they realize the ecosystem operates on a shared neural network, turning every step into a trigger for predatory ambushes by plant and beast alike.",
+  "style": "realistic",
+  "storyDuration": 96,
+  "characters": [
+    {
+      "name": "Commander Elias Vane",
+      "role": "Protagonist",
+      "description": "A career officer in his early 40s, Vane carries the weight of a previous mission where half his squad was lost to a navigational error he authorized. Pragmatic to a fault, he suppresses grief behind rigid protocol and checklists. His sole metric for success is the survival of the three people currently under his command. He moves with the economy of motion of a man who knows hesitation kills, constantly scanning the treeline for threats while calculating oxygen reserves and distance to the extraction ridge.",
+      "looks": "A 42-year-old man, weathered olive skin with deep lines etched around the eyes and mouth, close-cropped salt-and-pepper hair receding slightly at the temples, steel-grey eyes narrowed against the alien sunlight looking at a datapad in his hand, strong jawline shadowed by two days of dark stubble, wearing a scorched and dust-caked charcoal tactical EVA suit with reinforced knee pads and a magnetic holster at the hip, a torn mission patch on the right shoulder, utility belt heavy with canisters and tools, gloves frayed at the fingertips, standing in a wide stable stance on uneven volcanic rock"
+    },
+    {
+      "name": "Dr. Aris Thorne",
+      "role": "Science Officer",
+      "description": "Brilliant but distractible, Thorne views the lethal valley not as a death trap but as a once-in-a-millennium data set. His academic detachment is a coping mechanism; by categorizing the horror, he controls his fear. He notices the subtle bioluminescent pulse timing in the flora and the harmonic resonance in the fauna's calls—patterns the military mind misses. He carries a custom-modified multispectral scanner jury-rigged from the rover's wreckage, treating his own safety as a secondary variable in the equation of discovery.",
+      "looks": "A 34-year-old man, pale cool-toned skin flushed from exertion and altitude, messy chestnut-brown hair falling over his forehead in a sweat-dampened fringe, warm hazel eyes wide with intense focus looking down at a glowing handheld scanner, thin wire-rimmed glasses slipping down a straight nose, wearing a once-white environmental undersuit now stained ochre and green by alien pollen, sleeves rolled up revealing forearm tattoos of taxonomic trees, a bulky ruggedized backpack stuffed with sample vials and sensor nodules, fingerless tactical gloves allowing dexterity for touchscreens, crouched low examining a pulsating fungal frond"
+    },
+    {
+      "name": "Sergeant Kaelen 'Kae' Vance",
+      "role": "Security / Pilot",
+      "description": "The team's anchor, Kae is running on a cocktail of combat stims, synthetic adrenaline, and sheer stubbornness after a bulkhead crushed her left leg during the crash landing. She refuses evacuation, knowing her weight slows them down but her firepower keeps them alive. Cynical humor masks a fierce, almost maternal protectiveness toward the crew. She pilots the comms drone remotely with one hand while laying down suppressing fire with the other, her neural interface flickering at her temple. She knows the extraction window is a fantasy, but she'll die making it real for the others.",
+      "looks": "A 38-year-old woman, rich dark brown skin glistening with sweat, tight cornrows pulled back severely from a high forehead, piercing dark brown eyes tracking movement in the upper canopy scanning for aerial threats, a jagged white scar bisecting her left eyebrow, wearing a matte-black heavy assault exoskeleton frame over a compression flightsuit, the left leg brace locked rigid with hydraulic assists whining softly, a modular railgun resting against her shoulder connected to an ammo drum on her back, fingerless gloves showing knuckle tattoos reading 'AD ASTRA', a cracked pilot's wing pin pinned near her collar, leaning heavily on a carbon-fiber crutch planted in the dirt"
+    },
+    {
+      "name": "The Whisperer (Alien Fauna)",
+      "role": "Antagonist",
+      "description": "An apex predator evolved not for speed or strength, but for informational warfare. It lacks eyes, navigating via electroreception and the planet's mycelial 'internet.' Its skin is a dynamic chromatophore matrix allowing perfect visual and thermal mimicry of surroundings—rock, flora, even the shimmer of heat haze. It hunts by injecting false data into the neural net: mimicking a crewmate's distress call, replicating the seismic signature of safe footing, or silencing its own bio-electric field to become a 'hole' in the world's perception. It doesn't chase; it arranges the environment to deliver prey to its waiting maw.",
+      "looks": "A towering 3-meter-tall quadrupedal entity, skin a shifting oil-slick of iridescent chromatophores currently mimicking the grey-green lichen on the valley walls making its outline nearly invisible, smooth featureless head tapering to a prehensile proboscis instead of a jaw, no eyes only clusters of electroreceptive ampullae glittering like wet obsidian along the snout, six multi-jointed limbs ending in gecko-setae pads gripping the vertical cliff face silently, bioluminescent veins pulsing dimly along its flanks in sync with the surrounding fungal network, a low-frequency harmonic vibration distorting the air around it, perched motionless on a rocky overhang looking down at the trail below where the team walks"
+    }
+  ],
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "setting": "Crash site on an uncharted exoplanet valley floor at twilight. The wreckage of a survey rover smolders in soft, yielding soil. Strange purple ferns sway rhythmically without wind. Two massive alien moons rise on the horizon, casting pale, cold light across the surreal landscape.",
+      "description": "A wide establishing shot reveals the aftermath of the crash. The rover hull groans and settles deeper into the ground. No survivors are visible yet. The alien environment reacts to the intrusion with eerie, synchronized plant movement under the rising moons. - Verified!",
+      "script": "[Narrator]: Twilight descends on the silent wreckage. - Test Update",
+      "imagePrompt": "Cinematic wide establishing shot, low angle perspective capturing the vastness of the alien valley floor at twilight. Center frame: a massive, scorched survey rover hull half-sunk into soft, dark volcanic soil, thin trails of white smoke curling from ruptured panels, metal groaning under its own weight. Foreground: dense fields of bizarre purple ferns with translucent, bioluminescent veins pulsing in slow, synchronized waves, swaying in perfect unison despite zero atmospheric wind. Background: jagged basalt cliffs framing the scene, two enormous alien moons rising in conjunction on the horizon - one pale blue, one rust-red - casting dual shadows and painting the scene in ethereal, cold moonlight. Atmospheric volumetric lighting, dust motes dancing in the light beams. Hyper-realistic, photorealistic, 8k resolution, Unreal Engine 5 render style, cinematic color grading, detailed textures on metal and flora, sense of oppressive silence and imminent danger.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00001_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00001_.mp4"
+    },
+    {
+      "sceneNumber": 2,
+      "setting": "Inside the crashed rover cockpit, illuminated by flashing red emergency lights. The cracked viewport is pressed against by dense purple alien ferns.",
+      "description": "Extreme close-up on Commander Vane's hand gripping the console, knuckles white, as he exhales a sharp breath that fogs the freezing air. don't use slow motion, movement should be fast like a reaslistic world",
+      "script": "[Narrator]: Vane grips console, breath fogging cold air.",
+      "imagePrompt": "Extreme close-up macro shot, realistic photography style, cinematic lighting, photorealistic, 8k resolution. Focus on Commander Elias Vane's gloved hand gripping a rover console, knuckles white with tension, frayed fingertips of scorched and dust-caked charcoal tactical EVA suit sleeve visible. Harsh flashing red emergency lights casting crimson reflections on the glove and cracked viewport glass. Background blurred but discernible: purple alien ferns pressing against the fractured transparisteel windshield. Lower frame reveals Vane's weathered olive skin jawline shadowed by dark stubble, exhaling a sharp plume of condensation fogging the freezing air. Vane's steel-grey eyes are directed downward at the console readouts, not at the camera. High detail textures of volcanic dust, suit fabric weave, and moisture beads. Shallow depth of field.",
+      "duration": 6,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00002_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00019_.mp4"
+    },
+    {
+      "sceneNumber": 3,
+      "setting": "Rover aft compartment, dim emergency lighting, cramped bulkhead walls with exposed wiring and crash debris",
+      "description": "Kae administers a combat stim while eyeing the ceiling hatch, suppressing pain from her crushed leg.",
+      "script": "Stim injected. Eyes hatch. Silent wince.",
+      "imagePrompt": "Medium shot, realistic photography style, cinematic lighting, photorealistic, 8k. Inside a cramped rover aft compartment, dim red and blue emergency lights casting long shadows on scorched bulkheads. Sergeant Kaelen 'Kae' Vance, 38-year-old woman, rich dark brown skin glistening with sweat, tight cornrows pulled back severely, piercing dark brown eyes looking upward toward a ceiling hatch (not at camera), jagged white scar bisecting left eyebrow. She sits propped against a bulkhead, wearing a matte-black heavy assault exoskeleton frame over a compression flightsuit, left leg brace locked rigid with hydraulic assists, a makeshift tourniquet wrapped tight above the knee. Her right hand presses a glowing blue stim-pack injector against her neck, jaw clenched in a silent wince, fingerless gloves showing 'AD ASTRA' knuckle tattoos. A modular railgun rests against the wall within reach, a cracked pilot's wing pin on her collar. Volumetric dust motes dance in the harsh light beams, shallow depth of field focusing on her face and the injector.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00003_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00003_.mp4"
+    },
+    {
+      "sceneNumber": 4,
+      "setting": "Inside the crashed rover's science station, dimly lit by flickering holographic topographical maps and erratic scrolling sensor data on a handheld pad, the air thick with dust and the hum of damaged life support.",
+      "description": "Dr. Thorne analyzes erratic sensor readings on a datapad, suddenly freezing as he realizes the valley's flora operates as a unified neural network.",
+      "script": "[Narrator]: Thorne realizes the valley is a single organism.",
+      "imagePrompt": "Extreme close-up macro shot, shallow depth of field, focusing on Dr. Aris Thorne's face and hands: a 34-year-old man with pale cool-toned skin flushed from exertion, messy chestnut-brown hair damp with sweat falling over his forehead, warm hazel eyes wide with sudden terrifying realization, pupils dilated, thin wire-rimmed glasses slipping down his nose, fingerless tactical gloves hovering over a glowing handheld scanner displaying chaotic scrolling biometric data. He is frozen mid-tap, lips parted in a silent whisper. The only light source is the cool cyan flicker of the holographic maps and the scanner screen casting sharp shadows across his cheekbones and the taxonomic tree tattoos on his forearms visible under rolled-up sleeves of his stained ochre-and-green environmental undersuit. Background is a soft bokeh of the rover's damaged interior. Cinematic low-key lighting, volumetric dust motes dancing in the holographic glow, photorealistic, 8k resolution, highly detailed skin texture, realistic photography style.",
+      "duration": 6,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00004_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00004_.mp4"
+    },
+    {
+      "sceneNumber": 5,
+      "setting": "Rover interior - Group shot through the hatchway.",
+      "description": "The team prepares to exit the crashed rover; Vane orders departure, Thorne secures samples, Kae readies her weapon.",
+      "script": "[Commander Elias Vane]: Move out. ([Sergeant Kaelen 'Kae' Vance] chambers a round.)",
+      "imagePrompt": "Wide shot from inside the crashed rover cabin framing the open hatchway, harsh alien sunlight silhouetting the crew against the hyper-reactive valley landscape beyond. Commander Elias Vane, 42, weathered olive skin, salt-and-pepper hair, steel-grey eyes, stubble, scorched charcoal tactical EVA suit, magnetic holster, torn mission patch, utility belt, frayed gloves, standing wide stance checking magnetic boots on his feet, looking down at boots. Dr. Aris Thorne, 34, pale cool-toned skin, messy chestnut-brown hair, hazel eyes, wire-rim glasses, stained ochre-green environmental undersuit, taxonomic tree tattoos on forearms, bulky ruggedized backpack, fingerless gloves, crouched low packing a sample case, focused on case. Sergeant Kaelen 'Kae' Vance, 38, rich dark brown skin, tight cornrows, piercing dark brown eyes, scar bisecting left eyebrow, matte-black heavy assault exoskeleton frame over compression flightsuit, left leg brace locked rigid with hydraulics, modular railgun resting nearby, fingerless gloves with 'AD ASTRA' knuckle tattoos, cracked pilot wing pin, leaning on carbon-fiber crutch, chambering a round in her rifle, focused on weapon action. Dim red emergency lighting inside cabin contrasting with bright exterior. Cinematic, realistic, photorealistic, 8k, highly detailed, depth of field.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00005_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00005_.mp4"
+    },
+    {
+      "sceneNumber": 6,
+      "setting": "Exterior - Rover crash site, alien valley floor. The ramp of the downed survey rover lowers into a thick atmosphere swirling with bioluminescent spores drifting like radioactive snow. Volcanic rock terrain glows with faint subsurface pulses.",
+      "description": "The crew descends the rover ramp onto the alien surface. A low-angle perspective captures the first boots striking the soil, triggering a visible pulse in the ground and the instant defensive retraction of a nearby giant fern.",
+      "script": "Boots hit soil; ground pulses, fern retracts.",
+      "imagePrompt": "Extreme low-angle worm's-eye view shot looking up the interior of the rover's lowered ramp, realistic photography style, cinematic lighting, photorealistic, 8k resolution. Commander Elias Vane's boots (charcoal tactical EVA suit, reinforced knee pads, dust-caked) make first contact with the dark volcanic alien soil, kicking up a cloud of glowing bioluminescent spores drifting like snow in volumetric alien sunlight. The ground beneath his boots emits a faint, rapid bioluminescent pulse radiating outward through subsurface fungal networks. In the immediate foreground, a massive alien fern with iridescent fronds snaps shut violently, retracting into a protective armored sheath at the vibration. Behind Vane, Dr. Aris Thorne (pale skin, messy chestnut hair, hazel eyes fixed on glowing handheld scanner, ochre-stained undersuit, taxonomic forearm tattoos, bulky ruggedized backpack) descends cautiously. Sergeant Kaelen Vance (dark brown skin, cornrows, dark brown eyes scanning upper canopy, matte-black heavy assault exoskeleton, locked hydraulic left leg brace, modular railgun, carbon-fiber crutch) follows, leaning heavily. No character looks at the camera. High contrast between harsh alien sunlight and deep shadows, detailed texture on suit fabric and alien flora, atmospheric haze thick with glowing particulates.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00006_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00006_.mp4"
+    },
+    {
+      "sceneNumber": 7,
+      "setting": "Valley floor of an uncharted exoplanet, uneven volcanic rock interspersed with thick, bioluminescent moss and pulsating fungal growths under a harsh alien sun.",
+      "description": "The team moves in a tight triangle formation; Kae's boot sinks into reactive moss which emits a loud hissing gas cloud, alerting the neural network.",
+      "script": "[Narrator]: Kae's boot sinks; moss hisses warning.",
+      "imagePrompt": "Cinematic tracking shot from behind and slightly low, following three figures in tactical formation across a rugged alien valley floor. Foreground center: Sergeant Kaelen 'Kae' Vance, 38-year-old woman with rich dark brown skin glistening with sweat, tight cornrows, piercing dark brown eyes scanning the upper canopy, jagged white scar bisecting left eyebrow, wearing matte-black heavy assault exoskeleton frame over compression flightsuit, left leg locked in rigid hydraulic brace with whining assists, modular railgun resting on shoulder connected to ammo drum, carbon-fiber crutch planted deep, her booted foot currently sinking ankle-deep into a patch of thick grey-green moss that is violently expelling a pressurized cloud of shimmering spores with a visible sonic distortion ripple. Middle ground: Dr. Aris Thorne, 34-year-old pale man with messy sweat-dampened chestnut hair, wire-rim glasses slipping, hazel eyes fixed on a glowing handheld multispectral scanner, stained ochre-green environmental undersuit, sleeves rolled showing taxonomic tree tattoos, bulky ruggedized backpack, fingerless gloves, walking briskly but cautiously. Lead point: Commander Elias Vane, 42-year-old weathered olive skin, salt-and-pepper close-cropped hair, steel-grey eyes narrowed at a datapad, strong jaw shadowed by stubble, scorched charcoal tactical EVA suit with reinforced knees, magnetic holster, torn mission patch, utility belt heavy with canisters, wide stable stance on volcanic rock. Environment: Hyper-reactive flora, bioluminescent veins in ground, strange rock formations. Lighting: Harsh overhead alien sunlight casting sharp shadows, volumetric dust and spore clouds illuminated. Style: Realistic photography, photorealistic, cinematic lighting, 8k detail, depth of field focusing on Kae's boot and the hissing moss reaction. No character looks at camera.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00007_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00007_.mp4"
+    },
+    {
+      "sceneNumber": 8,
+      "setting": "Extreme macro view of the alien valley floor, bioluminescent moss carpeting volcanic rock, harsh alien sunlight casting sharp shadows.",
+      "description": "Extreme close-up reveals moss instantly shifting from calm blue to aggressive red as microscopic barbed tendrils erupt upward with surgical speed toward Kae's armored ankle.",
+      "script": "[Narrator]: Moss flares red, tendrils lunging upward.",
+      "imagePrompt": "Extreme macro close-up shot, macro lens perspective, photorealistic, cinematic lighting, 8k resolution. Focus on a patch of alien moss transitioning instantly from deep bioluminescent blue to violent crimson red. Dozens of hair-thin, translucent tendrils snake upward with blurring surgical speed, microscopic recurved barbs glinting sharply along their length like hypodermic needles. The tendrils target the armored ankle joint of Sergeant Kaelen 'Kae' Vance: matte-black heavy assault exoskeleton plating over compression flightsuit, carbon-fiber crutch shaft visible in blurred background, volcanic dust motes dancing in the light. Shallow depth of field isolates the violent flora motion against the rigid industrial texture of the exoskeleton. Harsh directional alien sunlight creates high contrast specular highlights on the barbs and suit armor. Realistic photography style, National Geographic macro photography aesthetic, intense detail, no humans looking at camera.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00008_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00008_.mp4"
+    },
+    {
+      "sceneNumber": 9,
+      "setting": "Valley floor, volcanic rock strewn with hyper-reactive moss that pulses with spreading crimson bioluminescence.",
+      "description": "Kae tears her trapped foot free, ripping her suit, and falls backward into Thorne. He catches her, both staring down as red veins race through the ground beneath them.",
+      "script": "Thorne catches Kae. Red veins pulse underground.",
+      "imagePrompt": "Realistic cinematic shot, medium close-up, slightly low angle. Dr. Aris Thorne (34, pale cool-toned skin, sweat-dampened messy chestnut hair, wide hazel eyes behind slipping wire-rim glasses, stained ochre-green environmental undersuit, taxonomic forearm tattoos, bulky rugged backpack) braces wide stance, arms locked around Sergeant Kaelen 'Kae' Vance (38, rich dark brown skin, tight cornrows, jagged scar left eyebrow, matte-black heavy assault exoskeleton with locked hydraulic left leg brace, modular railgun slung, 'AD ASTRA' knuckle tattoos, carbon-fiber crutch fallen aside). Kae grimaces, stumbling back into Thorne's chest, her boot torn free from glowing moss. Sharp focus on Thorne's face, eyes locked downward in horrified fascination. Foreground dominated by volcanic rock floor where vivid crimson bioluminescent veins spread rapidly through alien moss like lightning through a neural network, casting eerie red light on their faces. Harsh alien sunlight overhead mixes with volumetric dust and the pulsing red glow. Photorealistic, 8k, highly detailed textures, cinematic color grading.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00009_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00009_.mp4"
+    },
+    {
+      "sceneNumber": 10,
+      "setting": "Valley floor, uneven volcanic rock terrain scattered with hyper-reactive alien flora under harsh alien sunlight.",
+      "description": "Commander Vane signals a silent halt with a raised fist, points toward a distant ridge, taps his helmet comms, and mouths the order to move.",
+      "script": "[Vane mouths]: Move.",
+      "imagePrompt": "Extreme close-up portrait of Commander Elias Vane, 42-year-old male with weathered olive skin, deep etched lines around steel-grey eyes, salt-and-pepper close-cropped hair receding at temples, dark stubble on strong jawline, wearing scorched charcoal tactical EVA suit with torn mission patch on shoulder, sweat streams cutting through grime on forehead and cheeks, intense focused gaze directed downward off-camera towards unseen team, mouth slightly open forming the word 'Move' silently, gloved hand visible at edge of frame tapping side of helmet comms unit, harsh alien sunlight casting sharp shadows across facial contours highlighting texture of skin and stubble, background blurred bokeh of grey-green volcanic valley floor and pulsating alien flora, cinematic realistic photography style, 8k resolution, photorealistic, shallow depth of field",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00010_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00010_.mp4"
+    },
+    {
+      "sceneNumber": 11,
+      "setting": "Dense forest of towering, barkless bioluminescent columns. Translucent sacs hang overhead, pulsing rhythmically with internal fluids. Alien pollen hangs in shafts of diffused light.",
+      "description": "The team picks their way through the column forest. Thorne scans a hanging sac; it violently recoils from his scanner's beam.",
+      "script": "[Dr. Aris Thorne]: It reacted to the light.",
+      "imagePrompt": "Wide establishing shot, low angle looking up through a dense forest of towering 20-meter tall smooth barkless columns glowing with faint bioluminescent veins, translucent organic sacs suspended high overhead pulsing with viscous fluid, volumetric light shafts piercing alien pollen haze. Commander Elias Vane, 42, weathered olive skin, salt-and-pepper hair, steel-grey eyes, scorched charcoal tactical EVA suit, magnetic holster, torn mission patch, stands alert scanning treeline with datapad in hand. Dr. Aris Thorne, 34, pale cool-toned skin, messy chestnut hair, hazel eyes behind wire-rim glasses, stained ochre environmental undersuit, taxonomic forearm tattoos, bulky ruggedized backpack, crouched forward extending a glowing handheld multispectral scanner toward a nearby hanging sac. Sergeant Kaelen Vance, 38, rich dark brown skin, cornrows, dark brown eyes scanning canopy, jagged scar over left eyebrow, matte-black heavy assault exoskeleton with locked left leg brace, modular railgun on shoulder, carbon-fiber crutch planted firm, leaning heavily watching rear. The targeted sac, a meter-wide translucent membrane veined with luminescent capillaries, violently shudders and retracts upward away from the scanner beam like a startled animal, disturbing the pollen cloud. Cinematic realistic photography style, photorealistic, 8k resolution, global illumination, subsurface scattering on organic surfaces, dynamic range, atmospheric perspective, Sony Venice 2, anamorphic lens flare.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00011_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00011_.mp4"
+    },
+    {
+      "sceneNumber": 12,
+      "setting": "Extreme close-up macro shot on Dr. Thorne's jury-rigged multispectral scanner screen in the alien valley, volcanic rock and bioluminescent flora blurred in background",
+      "description": "Thorne reads the terrifying neural conductivity data, realizes the valley is a single connected organism, and lowers the scanner in dawning horror.",
+      "script": "[Narrator]: The valley is one single organism.",
+      "imagePrompt": "Extreme close-up macro photography shot, shallow depth of field focusing on a ruggedized handheld scanner screen displaying glowing green text 'NEURAL CONDUCTIVITY: 98% SYMBIOSIS DETECTED' against a dark UI background, a pale male thumb in a fingerless tactical glove hovering over a virtual 'TRANSMIT' button, focus pulling sharply to the face of Dr. Aris Thorne behind the device: 34-year-old man with pale cool-toned skin flushed from exertion, messy chestnut-brown hair damp with sweat falling over forehead, warm hazel eyes wide with sudden realization behind thin wire-rimmed glasses slipping down his nose, thin lips parting slightly, once-white environmental undersuit stained ochre and green by alien pollen, sleeves rolled up revealing taxonomic tree tattoos on forearms, bulky ruggedized backpack straps visible at shoulder, alien bioluminescent fungal light casting eerie cyan and magenta rim light on his face, blurred background of sharp volcanic rock and pulsating hyper-reactive flora, cinematic realistic style, photorealistic, 8k resolution, high dynamic range, detailed skin texture, sweat beads visible, intense dramatic atmosphere",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00012_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00012_.mp4"
+    },
+    {
+      "sceneNumber": 13,
+      "setting": "Alien forest floor, dim bioluminescent undergrowth, volcanic rock terrain, heavy atmosphere",
+      "description": "A camouflaged apex predator unfolds from rock mimicry beside Sergeant Vance, revealing a radial mouth in silence.",
+      "script": "[Narrator]: The stone rises, hungry.",
+      "imagePrompt": "Cinematic low-angle shot, photorealistic, 8k resolution. Foreground: Sergeant Kaelen 'Kae' Vance, 38-year-old woman, rich dark brown skin glistening with sweat, tight cornrows, piercing dark brown eyes looking down in sharp realization at the creature beside her good leg, jagged white scar bisecting left eyebrow, wearing matte-black heavy assault exoskeleton frame over compression flightsuit, left leg brace locked rigid with hydraulic assists, modular railgun resting against shoulder, fingerless gloves showing 'AD ASTRA' knuckle tattoos, leaning on carbon-fiber crutch. Background center: The Whisperer (Alien Fauna) unfolding from perfect grey-green lichen-covered rock mimicry, towering 3-meter quadrupedal entity, skin shifting oil-slick iridescent chromatophores revealing true form, smooth featureless head splitting vertically open to reveal a terrifying radial mouth ringed with electrosensitive ampullae glittering like wet obsidian, six multi-jointed limbs with gecko-setae pads unfolding silently, bioluminescent veins pulsing dimly along flanks syncing with surrounding fungal network, low-frequency harmonic vibration distorting air. Alien forest floor environment, strange pulsating flora, volcanic rock, volumetric fog, dramatic rim lighting from bioluminescence, high contrast, realistic textures, Unreal Engine 5 render style.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00013_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00013_.mp4"
+    },
+    {
+      "sceneNumber": 14,
+      "setting": "Extreme close-up on the Whisperer's proboscis and electroreceptive clusters, perched on a lichen-covered cliff face in the alien valley, bioluminescent veins pulsing in the dim light.",
+      "description": "The Whisperer perfectly mimics Commander Vane's voice to lure Sergeant Kae into a trap, triggering her instinctive reaction.",
+      "script": "Whisperer mimics Vane: 'Kae, down!' Kae snaps toward sound.",
+      "imagePrompt": "Extreme macro close-up shot, shallow depth of field, focusing on the Whisperer's featureless head tapering into a prehensile proboscis, skin a shifting oil-slick of iridescent chromatophores perfectly mimicking grey-green lichen texture, clusters of electroreceptive ampullae glittering like wet obsidian along the snout pulsing with low-frequency harmonic vibration distorting the air visually, bioluminescent veins throbbing dimly along visible flank edges. In the blurred background, Sergeant Kae Vance (rich dark brown skin, tight cornrows, jagged scar bisecting left eyebrow, matte-black heavy assault exoskeleton, modular railgun on shoulder, carbon-fiber crutch) snaps her head sharply toward the source, piercing dark brown eyes wide tracking the auditory threat, sweat glistening on high forehead. Cinematic lighting, volumetric alien atmosphere, photorealistic, 8k resolution, highly detailed textures, realistic style.",
+      "duration": 6,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00014_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00014_.mp4"
+    },
+    {
+      "sceneNumber": 15,
+      "setting": "Alien forest floor, dense with bioluminescent flora and volcanic rock, harsh sunlight piercing the canopy",
+      "description": "Vane shouts a warning as Thorne tackles Kae sideways; the Whisperer launches from above, striking the empty space Thorne just occupied.",
+      "script": "Vane yells 'Kae down!' Thorne tackles her. Beast misses.",
+      "imagePrompt": "Dynamic low-angle wide action shot, motion blur capturing high-speed movement, photorealistic cinematic lighting. Commander Elias Vane (42, olive skin, salt-and-pepper hair, steel-grey eyes, charcoal tactical EVA suit, magnetic holster) lunges forward raising a rifle, mouth open shouting, staring upward at the threat. Dr. Aris Thorne (34, pale skin, messy chestnut hair, hazel eyes, wire-rim glasses, stained white undersuit, bulky backpack) mid-air horizontal tackle, fingerless gloves gripping Sergeant Kaelen Vance. Sergeant Kae Vance (38, dark brown skin, tight cornrows, scarred eyebrow, matte-black assault exoskeleton, locked left leg brace, railgun slung, carbon-fiber crutch falling away) knocked sideways off balance, dark eyes wide with surprise, looking at Thorne. The Whisperer (3-meter quadruped, iridescent chromatophore skin mimicking grey-green lichen, featureless head with electroreceptive ampullae, six multi-jointed limbs with gecko-setae pads, bioluminescent veins pulsing) launching downward from a rocky overhang above, massive blurred form distorting air with harmonic vibration, impacting the exact spot Thorne vacated milliseconds prior, alien forest floor debris exploding upward. Harsh alien sunlight shafts through canopy, bioluminescent flora glowing, volcanic rock textures sharp, 8k resolution, realistic photography style, high shutter speed.",
+      "duration": 6,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00015_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00015_.mp4"
+    },
+    {
+      "sceneNumber": 16,
+      "setting": "Airborne beneath a towering basalt column in the valley, the air thick with bioluminescent spores and the hum of the planetary neural network.",
+      "description": "The Whisperer misses Thorne, lands on a column, and flashes a blinding strobe pattern from its chromatophore skin. The intense light triggers all hanging caustic sacs on the column to burst simultaneously, raining corrosive fluid downward.",
+      "script": "Strobe flashes. Sacs burst. Acid rains down.",
+      "imagePrompt": "Extreme low-angle shot looking straight up the sheer face of a towering basalt column. The Whisperer, a towering 3-meter quadrupedal entity with iridescent oil-slick chromatophore skin currently flashing a blinding, high-frequency strobe pattern of intense white and ultraviolet light, perches atop the column via six multi-jointed gecko-setae limbs. Its featureless head tapers to a prehensile proboscis; clusters of electroreceptive ampullae glitter like wet obsidian. The strobe illuminates dozens of translucent, pulsating organic sacs clustered beneath a rocky overhang on the column side. All sacs rupture simultaneously in a synchronized explosion, spraying a violent torrent of viscous, sizzling yellow-green caustic fluid directly toward the camera lens. Dr. Aris Thorne, pale skin flushed, messy chestnut hair, wire-rim glasses, ochre-stained undersuit, bulky ruggedized backpack, is visible in the lower foreground mid-dodge, hazel eyes wide with terror, throwing an arm up to shield his face from the deluge. Cinematic volumetric lighting, high-speed photography freeze-frame of fluid dynamics, photorealistic 8k, unreal engine 5 render style, intense dynamic contrast between blinding strobe and dark rock.",
+      "duration": 5,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00016_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00016_.mp4"
+    },
+    {
+      "sceneNumber": 17,
+      "setting": "Narrow crevice entrance on a volcanic ridge wall, dense alien forest floor, heavy acid rain hissing on impact",
+      "description": "Vane shoves Thorne into the crevice, Kae hobbles in on crutch, Vane fires plasma pistol behind them melting rock to seal the entrance.",
+      "script": "Vane shoves Thorne in. Kae hobbles. Entrance seals.",
+      "imagePrompt": "First-person POV handheld shaky camera, motion blur, wide angle lens distortion, realistic photography style, cinematic lighting, photorealistic 8k. Foreground: gloved hands (Commander Vane: frayed fingertips, charcoal EVA suit sleeves, utility belt visible) raising a compact plasma pistol, acid rain sizzling steam on forearm armor. Mid-ground: Dr. Aris Thorne (pale skin, messy chestnut hair, wire-rim glasses, stained ochre undersuit, taxonomic forearm tattoos, bulky sensor backpack) disappearing headfirst into a jagged dark crevice; Sergeant Kaelen Vance (rich dark brown skin, tight cornrows, matte-black heavy assault exoskeleton, locked hydraulic left leg brace, carbon-fiber crutch, modular railgun slung, 'AD ASTRA' knuckle tattoos) hobbling aggressively past camera into the crevice, glancing back with piercing dark brown eyes, scar bisecting eyebrow. Background: Plasma burst erupting from pistol muzzle -- blinding blue-white flare illuminating molten rock splashing across crevice mouth, sealing it with glowing orange slag, alien fungal flora recoiling from heat, volcanic rock walls wet with acid rain, low mist swirling. Harsh alien daylight filtered through toxic clouds, high contrast, visceral texture detail, no characters looking at camera.",
+      "duration": 6,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00017_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00017_.mp4"
+    },
+    {
+      "sceneNumber": 18,
+      "setting": "A tight, vertical crevice in volcanic rock, dimly lit by faint bioluminescent moss and the blue glow of suit HUDs. Walls press close, forcing the team into a cramped, standing rest. The air is thick with dust and the sound of labored breathing and rhythmic low-oxygen alarms.",
+      "description": "The team pauses in a narrow rock fissure. Commander Vane checks his wrist display showing critically low oxygen. Dr. Thorne monitors a scanner revealing the valley's neural network flaring into a predatory high-alert state.",
+      "script": "Vane: Twelve percent oxygen. Thorne: The network is hunting us.",
+      "imagePrompt": "Realistic photography style, cinematic lighting, photorealistic, claustrophobic medium shot inside a narrow vertical rock crevice. Foreground left: Commander Elias Vane, 42, weathered olive skin, deep lines, salt-and-pepper close-cropped hair, steel-grey eyes, dark stubble, wearing scorched charcoal tactical EVA suit with reinforced knees, magnetic holster, torn mission patch, utility belt, frayed gloves; he raises his left wrist to eye level, staring intently at a glowing holographic display on his gauntlet reading '12% O2' in stark red numbers. Center right: Dr. Aris Thorne, 34, pale cool-toned skin flushed, messy sweat-dampened chestnut fringe, warm hazel eyes wide behind slipping wire-rim glasses, stained ochre-green environmental undersuit, sleeves rolled showing taxonomic forearm tattoos, fingerless gloves; he crouches slightly, holding a custom multispectral scanner projecting a 3D holographic map of the valley glowing intense crimson red, his face illuminated by the bloody light. Background shadows: Sergeant Kaelen 'Kae' Vance, 38, rich dark brown skin glistening, tight cornrows, piercing dark brown eyes scanning the crevice exit, jagged scar bisecting left eyebrow, matte-black heavy assault exoskeleton over compression flightsuit, locked hydraulic left leg brace, modular railgun resting on shoulder, 'AD ASTRA' knuckle tattoos, cracked pilot wing pin; she leans heavily on a carbon-fiber crutch, chest heaving, looking away toward the darkness ahead. Dim bioluminescent moss on jagged rock walls provides faint blue-green rim lighting. Low-angle perspective looking up slightly, shallow depth of field focusing on Vane's wrist and Thorne's scanner. High detail, 8k resolution, raw style.",
+      "duration": 6,
+      "imagePath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/Flux2_dev_00018_.png",
+      "videoPath": "C:/Users/Boby/AppData/Local/Comfy-Desktop/ComfyUI-Shared/output/video/LTX_2.3_i2v_00018_.mp4"
+    }
+  ]
+}

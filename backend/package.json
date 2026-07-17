@@ -1,0 +1,26 @@
+{
+  "name": "workflow",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "main": "bun index.ts",
+    "generate-assets": "bun src/generate_assets.ts",
+    "generate-videos": "bun src/generate_videos_only.ts",
+    "merge-videos": "bun src/merge_videos.ts",
+    "modify-angles": "bun src/modify_story_angles.ts",
+    "migrate-style": "bun src/migrate_style.ts",
+    "server": "bun server.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "ollama": "^0.6.3"
+  }
+}
