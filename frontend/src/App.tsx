@@ -48,6 +48,16 @@ export default function App() {
   const [editingDescSceneNum, setEditingDescSceneNum] = useState<number | null>(null);
   const [editedDescription, setEditedDescription] = useState('');
 
+  // Track text enhancement loading states per scene
+  const [enhancingDescSceneNum, setEnhancingDescSceneNum] = useState<number | null>(null);
+  const [enhancingScriptSceneNum, setEnhancingScriptSceneNum] = useState<number | null>(null);
+
+  // Track cache busters for scene media (forces browsers to reload regenerated images/videos)
+  const [mediaCacheBuster, setMediaCacheBuster] = useState<Record<number, number>>({});
+
+  // Track which scene is currently being previewed in the image lightbox modal
+  const [previewImageSceneNum, setPreviewImageSceneNum] = useState<number | null>(null);
+
   // Track which scene videos are actively playing in place
   const [playingVideoMap, setPlayingVideoMap] = useState<Record<number, boolean>>({});
 
@@ -82,7 +92,8 @@ export default function App() {
       if (!isMounted) return;
       
       setComfyStatus('connecting');
-      const wsUrl = `ws://127.0.0.1:8188/ws?clientId=${clientIdRef.current}`;
+      // const wsUrl = `ws://127.0.0.1:8188/ws?clientId=${clientIdRef.current}`;
+      const wsUrl = `http://localhost:8188/ws`;
       console.log(`[ComfyWS] Connecting to ${wsUrl}`);
       
       try {
@@ -117,6 +128,7 @@ export default function App() {
       };
 
       ws.onmessage = async (event) => {
+        console.log(event)
         if (!isMounted) return;
 
         // Handle Binary message (Preview Frames)
@@ -322,6 +334,8 @@ export default function App() {
       
       if (data.success && data.story) {
         setStory(data.story);
+        // Force reload of regenerated media via cache buster
+        setMediaCacheBuster((prev) => ({ ...prev, [sceneNumber]: Date.now() }));
         // If we generated video, reset playing video toggle to make sure it reloads
         if (type === 'video' || type === 'both') {
           setPlayingVideoMap((prev) => ({ ...prev, [sceneNumber]: false }));
@@ -334,9 +348,47 @@ export default function App() {
     }
   };
 
-  const getMediaUrl = (filePath?: string) => {
+  const handleEnhanceText = async (sceneNumber: number, type: 'script' | 'description', currentText: string) => {
+    try {
+      setError(null);
+      if (type === 'description') {
+        setEnhancingDescSceneNum(sceneNumber);
+      } else {
+        setEnhancingScriptSceneNum(sceneNumber);
+      }
+
+      const res = await fetch('http://localhost:3001/api/scene/enhance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneNumber, type, text: currentText }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to enhance ${type}`);
+      }
+      if (data.success && data.enhancedText) {
+        if (type === 'description') {
+          setEditedDescription(data.enhancedText);
+        } else {
+          setEditedScript(data.enhancedText);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || `Failed to enhance ${type}.`);
+    } finally {
+      if (type === 'description') {
+        setEnhancingDescSceneNum(null);
+      } else {
+        setEnhancingScriptSceneNum(null);
+      }
+    }
+  };
+
+  const getMediaUrl = (sceneNumber: number, filePath?: string) => {
     if (!filePath) return '';
-    return `http://localhost:3001/api/media?path=${encodeURIComponent(filePath)}`;
+    const buster = mediaCacheBuster[sceneNumber] || 0;
+    const busterParam = buster ? `&cb=${buster}` : '';
+    return `http://localhost:3001/api/media?path=${encodeURIComponent(filePath)}${busterParam}`;
   };
 
   if (loading) {
@@ -494,7 +546,7 @@ export default function App() {
                         key={story.mergedVideoPath}
                         controls 
                         className="master-video-player"
-                        src={getMediaUrl(story.mergedVideoPath)}
+                        src={getMediaUrl(0, story.mergedVideoPath)}
                       />
                     ) : (
                       <div className="master-video-fallback">
@@ -578,7 +630,7 @@ export default function App() {
                         {isVideoPlaying && scene.videoPath ? (
                           // In-place Video Player
                           <video
-                            src={getMediaUrl(scene.videoPath)}
+                            src={getMediaUrl(scene.sceneNumber, scene.videoPath)}
                             controls
                             autoPlay
                             loop
@@ -587,9 +639,11 @@ export default function App() {
                         ) : scene.imagePath ? (
                           // Image display
                           <img
-                            src={getMediaUrl(scene.imagePath)}
+                            src={getMediaUrl(scene.sceneNumber, scene.imagePath)}
                             alt={`Scene ${scene.sceneNumber}`}
                             className="preview-image"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setPreviewImageSceneNum(scene.sceneNumber)}
                           />
                         ) : (
                           // Empty/Placeholder
@@ -602,6 +656,48 @@ export default function App() {
                             <span style={{ fontSize: '0.8rem' }}>No image generated yet</span>
                           </div>
                         )}
+
+                        {/* Floating actions in top right corner of media container */}
+                        <div className="floating-media-actions">
+                          {scene.imagePath && (
+                            <button
+                              type="button"
+                              className="floating-action-btn"
+                              onClick={() => setPreviewImageSceneNum(scene.sceneNumber)}
+                              title="Preview Image"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                <line x1="11" y1="8" x2="11" y2="14" />
+                                <line x1="8" y1="11" x2="14" y2="11" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="floating-action-btn"
+                            disabled={!!isRegenerating}
+                            onClick={() => handleRegenerate(scene.sceneNumber, 'image')}
+                            title="Regenerate Image"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className="floating-action-btn"
+                            disabled={!!isRegenerating || !scene.imagePath}
+                            onClick={() => handleRegenerate(scene.sceneNumber, 'video')}
+                            title={!scene.imagePath ? 'Generate the image first' : 'Regenerate Video'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M23 7l-7 5 7 5V7z" />
+                              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                            </svg>
+                          </button>
+                        </div>
 
                         {/* Play Video overlay overlayed on image */}
                         {!isVideoPlaying && scene.videoPath && (
@@ -667,7 +763,7 @@ export default function App() {
                               value={editedDescription}
                               onChange={(e) => setEditedDescription(e.target.value)}
                             />
-                            <div className="edit-actions-row">
+                            <div className="edit-actions-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               <button
                                 type="button"
                                 className="cancel-btn"
@@ -677,10 +773,46 @@ export default function App() {
                               </button>
                               <button
                                 type="button"
+                                className="enhance-btn"
+                                disabled={enhancingDescSceneNum === scene.sceneNumber}
+                                onClick={() => handleEnhanceText(scene.sceneNumber, 'description', editedDescription)}
+                              >
+                                {enhancingDescSceneNum === scene.sceneNumber ? 'Enhancing...' : 'Enhance with Ollama'}
+                              </button>
+                              <button
+                                type="button"
                                 className="save-btn"
                                 onClick={() => handleUpdateDescription(scene.sceneNumber)}
                               >
                                 Save Action
+                              </button>
+                              <button
+                                type="button"
+                                className="save-btn"
+                                style={{ background: 'linear-gradient(135deg, var(--green-accent) 0%, var(--accent-purple) 100%)' }}
+                                onClick={async () => {
+                                  try {
+                                    setError(null);
+                                    const res = await fetch('http://localhost:3001/api/scene/update', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ sceneNumber: scene.sceneNumber, description: editedDescription }),
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok) {
+                                      throw new Error(data.error || 'Failed to update description');
+                                    }
+                                    if (data.success && data.story) {
+                                      setStory(data.story);
+                                    }
+                                    setEditingDescSceneNum(null);
+                                    handleRegenerate(scene.sceneNumber, 'image');
+                                  } catch (err: any) {
+                                    setError(err.message || 'Failed to update description.');
+                                  }
+                                }}
+                              >
+                                Save &amp; Regen Image
                               </button>
                             </div>
                           </>
@@ -720,7 +852,7 @@ export default function App() {
                               value={editedScript}
                               onChange={(e) => setEditedScript(e.target.value)}
                             />
-                            <div className="edit-actions-row">
+                            <div className="edit-actions-row" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               <button
                                 type="button"
                                 className="cancel-btn"
@@ -730,10 +862,46 @@ export default function App() {
                               </button>
                               <button
                                 type="button"
+                                className="enhance-btn"
+                                disabled={enhancingScriptSceneNum === scene.sceneNumber}
+                                onClick={() => handleEnhanceText(scene.sceneNumber, 'script', editedScript)}
+                              >
+                                {enhancingScriptSceneNum === scene.sceneNumber ? 'Enhancing...' : 'Enhance with Ollama'}
+                              </button>
+                              <button
+                                type="button"
                                 className="save-btn"
                                 onClick={() => handleUpdateScript(scene.sceneNumber)}
                               >
                                 Save Script
+                              </button>
+                              <button
+                                type="button"
+                                className="save-btn"
+                                style={{ background: 'linear-gradient(135deg, var(--green-accent) 0%, var(--accent-purple) 100%)' }}
+                                onClick={async () => {
+                                  try {
+                                    setError(null);
+                                    const res = await fetch('http://localhost:3001/api/scene/update', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ sceneNumber: scene.sceneNumber, script: editedScript }),
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok) {
+                                      throw new Error(data.error || 'Failed to update script');
+                                    }
+                                    if (data.success && data.story) {
+                                      setStory(data.story);
+                                    }
+                                    setEditingSceneNum(null);
+                                    handleRegenerate(scene.sceneNumber, 'video');
+                                  } catch (err: any) {
+                                    setError(err.message || 'Failed to update script.');
+                                  }
+                                }}
+                              >
+                                Save &amp; Regen Video
                               </button>
                             </div>
                           </>
@@ -925,6 +1093,42 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Fullscreen Image Preview Lightbox Modal */}
+        {previewImageSceneNum !== null && story && (
+          (() => {
+            const previewScene = story.scenes.find(s => s.sceneNumber === previewImageSceneNum);
+            if (!previewScene || !previewScene.imagePath) return null;
+            return (
+              <div className="lightbox-overlay" onClick={() => setPreviewImageSceneNum(null)}>
+                <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+                  <button 
+                    type="button" 
+                    className="lightbox-close-btn" 
+                    onClick={() => setPreviewImageSceneNum(null)}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                  <img 
+                    src={getMediaUrl(previewScene.sceneNumber, previewScene.imagePath)} 
+                    alt={`Scene ${previewScene.sceneNumber}`} 
+                    className="lightbox-image"
+                  />
+                  <div className="lightbox-info">
+                    <span className="lightbox-scene-badge">Scene {previewScene.sceneNumber}</span>
+                    <p className="lightbox-desc">{previewScene.description}</p>
+                    {previewScene.script && (
+                      <p className="lightbox-script"><strong>Script:</strong> {previewScene.script}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()
         )}
       </main>
     </Theme>

@@ -3,6 +3,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { spawn } from "child_process";
 import { config } from "dotenv";
+import { callOllama } from "./src/config.ts";
 
 config(); // Load environment variables
 
@@ -262,7 +263,7 @@ serve({
 
       // 2. POST /api/scene/update
       if (req.method === "POST" && pathname === "/api/scene/update") {
-        const body = await req.json();
+        const body = (await req.json()) as any;
         const { sceneNumber, script, description } = body;
         if (sceneNumber === undefined || (script === undefined && description === undefined)) {
           return new Response(JSON.stringify({ error: "Missing sceneNumber, script, or description" }), {
@@ -283,7 +284,40 @@ serve({
         }
 
         if (script !== undefined) scene.script = script;
-        if (description !== undefined) scene.description = description;
+        if (description !== undefined) {
+          scene.description = description;
+
+          // Regenerate imagePrompt using Ollama based on the updated scene description
+          try {
+            const characters = JSON.stringify(storyData.characters, null, 2);
+            const style = storyData.style || "realistic";
+            const setting = scene.setting || "";
+            const systemPrompt = `You are a professional storyboard artist.
+Given the following scene setting, scene action description, visual style, and character profiles, generate a highly detailed, single-paragraph image generation prompt containing camera direction, lighting, setting details, character names with their exact looks, poses, and expressions.
+Visual style: ${style}
+Characters: ${characters}
+Scene Setting: ${setting}
+Scene Action Description: ${description}
+
+CRITICAL Instructions:
+1. The prompt must be a single paragraph.
+2. Incorporate character looks and style-specific descriptors.
+3. Characters MUST NEVER look directly at the camera or viewer.
+4. Return ONLY the raw image generation prompt paragraph. Do not add explanation, JSON, markdown formatting, or intro text.`;
+
+            console.log(`[Server] Generating new imagePrompt for scene ${sceneNumber} due to description update...`);
+            const responsePrompt = await callOllama([
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Generate the image prompt.` }
+            ], false);
+            if (responsePrompt && typeof responsePrompt === "string") {
+              scene.imagePrompt = responsePrompt.trim();
+              console.log(`[Server] New imagePrompt generated: "${scene.imagePrompt.substring(0, 100)}..."`);
+            }
+          } catch (err: any) {
+            console.error(`[Server] Failed to regenerate imagePrompt after description update: ${err.message}`);
+          }
+        }
 
         // Save updated assets
         await fs.writeFile(storyAssetsPath, JSON.stringify(storyData, null, 2), "utf-8");
@@ -295,7 +329,10 @@ serve({
           const mainScene = mainStory.scenes.find((s: any) => s.sceneNumber === sceneNumber);
           if (mainScene) {
             if (script !== undefined) mainScene.script = script;
-            if (description !== undefined) mainScene.description = description;
+            if (description !== undefined) {
+              mainScene.description = description;
+              mainScene.imagePrompt = scene.imagePrompt;
+            }
             await fs.writeFile(storyPath, JSON.stringify(mainStory, null, 2), "utf-8");
           }
         } catch {
@@ -307,9 +344,65 @@ serve({
         });
       }
 
+      // 2.5 POST /api/scene/enhance
+      if (req.method === "POST" && pathname === "/api/scene/enhance") {
+        const body = (await req.json()) as any;
+        const { sceneNumber, type, text } = body; // type is 'script' | 'description'
+        if (sceneNumber === undefined || !type || text === undefined) {
+          return new Response(JSON.stringify({ error: "Missing sceneNumber, type, or text" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+
+        console.log(`[Server] Enhancing ${type} for scene ${sceneNumber} using Ollama...`);
+
+        let systemPrompt = "";
+        if (type === "description") {
+          systemPrompt = `You are a professional cinematic director and screenwriter.
+Your task is to take an existing scene action description and enhance it with vivid, sensory, and cinematic details to make it highly evocative, dramatic, and clear.
+Keep it relatively concise (1-3 sentences) but highly descriptive.
+Do not describe camera angles or technical camera terms here, just focus on the action, environment, emotions, and character poses.
+Return ONLY the raw enhanced description. Do not add explanations, intro text, markdown formatting, or JSON. Just return the enhanced text.`;
+        } else if (type === "script") {
+          systemPrompt = `You are a professional screenwriter.
+Your task is to take an existing dialogue or narration script and enhance it to make it more natural, engaging, and dialogue-appropriate for the scene.
+Ensure it is written in speaker format, e.g. [Character Name]: Dialogue. Or [Narrator]: Dialogue/Text.
+Keep it extremely short and concise (at most 1-2 short sentences, maximum 15 words) so that it can be spoken in under 5-8 seconds.
+Return ONLY the raw enhanced script. Do not add explanations, intro text, markdown formatting, or JSON. Just return the enhanced text.`;
+        } else {
+          return new Response(JSON.stringify({ error: `Invalid type: ${type}` }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+
+        try {
+          const responseText = await callOllama([
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Original ${type}: "${text}"` }
+          ], false);
+
+          if (responseText && typeof responseText === "string") {
+            const enhancedText = responseText.trim().replace(/^"|"$/g, ""); // Strip surrounding quotes if any
+            return new Response(JSON.stringify({ success: true, enhancedText }), {
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            });
+          } else {
+            throw new Error("Ollama returned an empty response.");
+          }
+        } catch (err: any) {
+          console.error(`[Server] Failed to enhance ${type} via Ollama: ${err.message}`);
+          return new Response(JSON.stringify({ error: `Failed to enhance via Ollama: ${err.message}` }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          });
+        }
+      }
+
       // 3. POST /api/scene/regenerate
       if (req.method === "POST" && pathname === "/api/scene/regenerate") {
-        const body = await req.json();
+        const body = (await req.json()) as any;
         const { sceneNumber, type, clientId } = body; // type is 'image' | 'video' | 'both'
         if (sceneNumber === undefined || !type) {
           return new Response(JSON.stringify({ error: "Missing sceneNumber or type" }), {
